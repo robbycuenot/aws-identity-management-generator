@@ -131,16 +131,23 @@ Automate the generator with GitHub Actions using OIDC authentication.
    - Import `robbycuenot/aws-identity-management` as a private repo
    - Both repos include a `sync-from-upstream.yaml` workflow to pull updates from upstream via PR
 
-2. Create an IAM OIDC provider and role for GitHub Actions with the same permissions as the permission set above. **Important:** The trust policy must reference the GitHub environment name, not the branch. Example subject claim: `repo:your-org/aws-identity-management:environment:production`
+2. Choose a GitHub environment name (e.g., `production`). Create this environment in both repositories under Settings → Environments. All secrets and variables will be configured in this environment.
 
-3. Configure GitHub environment variables:
-   - `AWS_ROLE_ARN`, `AWS_REGION`, `STATE_MODE`, `PLATFORM`, `OUTPUT`, `ENABLE_TEAM`
+3. Create an IAM OIDC provider and role for GitHub Actions with the same permissions as the permission set above. **Important:** The trust policy must reference the GitHub environment name, not the branch. Example subject claim: `repo:your-org/aws-identity-management-generator:environment:production`
 
-4. Add the `GENERATOR_DEPLOY_KEY` secret (if your generator repo is private).
+4. Configure GitHub environment variables in the `production` environment:
+   - `AWS_ROLE_ARN` - ARN of the OIDC role created in step 3
+   - `AWS_REGION` - Region where IAM Identity Center is configured
+   - `STATE_MODE` - `single` or `multi`
+   - `PLATFORM` - `local` or `tfc`
+   - `OUTPUT` - Output directory (typically `./output`)
+   - `ENABLE_TEAM` - `true` or `false`
 
-5. See the [example workflow](https://github.com/robbycuenot/aws-identity-management/blob/main/.github/workflows/iam_identity_center_generator.yaml) for reference.
+5. Add the `GENERATOR_DEPLOY_KEY` secret to the environment (if your generator repo is private).
 
-If using the [infrastructure module](infrastructure/README.md), steps 2-4 are handled automatically.
+6. See the [example workflow](https://github.com/robbycuenot/aws-identity-management/blob/main/.github/workflows/iam_identity_center_generator.yaml) for reference.
+
+If using the [infrastructure module](infrastructure/README.md), steps 3-5 are handled automatically.
 
 ---
 
