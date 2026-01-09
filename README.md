@@ -2,6 +2,8 @@
 
 Automated Terraform code generation for AWS IAM Identity Center.
 
+> **Companion Repository:** [aws-identity-management](https://github.com/robbycuenot/aws-identity-management) - The output repository where generated Terraform configurations are stored and applied. Use both repositories together for a complete IAM Identity Center management solution.
+
 This tool reverse-generates the current AWS IAM Identity Center state into structured Terraform HCL, addressing challenges that come with maintaining a system modified by multiple sources (SCIM, AWS console, Account Factory, break-glass scenarios, etc.).
 
 ## Overview
