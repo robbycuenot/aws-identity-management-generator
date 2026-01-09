@@ -131,11 +131,11 @@ Automate the generator with GitHub Actions using OIDC authentication.
    - Import `robbycuenot/aws-identity-management` as a private repo
    - Both repos include a `sync-from-upstream.yaml` workflow to pull updates from upstream via PR
 
-2. Choose a GitHub environment name (e.g., `production`). Create this environment in both repositories under Settings → Environments. All secrets and variables will be configured in this environment.
+2. Choose a GitHub environment name (e.g., `production`). Create this environment on the `aws-identity-management` repository under Settings → Environments. All secrets and variables will be configured in this environment. (The generator workflow runs from the identity-management repo, so the environment is only needed there.)
 
-3. Create an IAM OIDC provider and role for GitHub Actions with the same permissions as the permission set above. **Important:** The trust policy must reference the GitHub environment name, not the branch. Example subject claim: `repo:your-org/aws-identity-management-generator:environment:production`
+3. Create an IAM OIDC provider and role for GitHub Actions with the same permissions as the permission set above. **Important:** The trust policy must reference the GitHub environment name and the `aws-identity-management` repo, not the generator repo. Example subject claim: `repo:your-org/aws-identity-management:environment:production`
 
-4. Configure GitHub environment variables in the `production` environment:
+4. Configure GitHub environment variables in the `production` environment on `aws-identity-management`:
    - `AWS_ROLE_ARN` - ARN of the OIDC role created in step 3
    - `AWS_REGION` - Region where IAM Identity Center is configured
    - `STATE_MODE` - `single` or `multi`
@@ -143,7 +143,7 @@ Automate the generator with GitHub Actions using OIDC authentication.
    - `OUTPUT` - Output directory (typically `./output`)
    - `ENABLE_TEAM` - `true` or `false`
 
-5. Add the `GENERATOR_DEPLOY_KEY` secret to the environment (if your generator repo is private).
+5. Add the `GENERATOR_DEPLOY_KEY` secret to the environment (required to clone the private generator repo). Generate a deploy key for your generator repo and add the private key here.
 
 6. See the [example workflow](https://github.com/robbycuenot/aws-identity-management/blob/main/.github/workflows/iam_identity_center_generator.yaml) for reference.
 
