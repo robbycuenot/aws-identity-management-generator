@@ -1,0 +1,9 @@
+data "tfe_outputs" "identity_store" {
+  organization = "{{ tfe_organization }}"
+  workspace = "{{ workspace_identity_store }}"
+}
+
+data "tfe_outputs" "permission_sets" {
+  organization = "{{ tfe_organization }}"
+  workspace = "{{ workspace_permission_sets }}"
+}

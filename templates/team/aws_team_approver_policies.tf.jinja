@@ -1,0 +1,16 @@
+{% for policy in approver_policies %}
+module "approvers___{{ policy.ResourceName }}" {
+  source            = "./modules/approver"
+  environment_data  = local.approver_environment_data
+
+  entity_type   = "{{ policy.type }}"
+  entity_value  = "{{ policy.name }}"
+
+  approvers = [
+    {% for approver in policy.approvers | sort %}
+    "{{ approver }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  ]
+}
+
+{% endfor %}

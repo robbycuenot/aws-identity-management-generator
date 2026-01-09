@@ -1,0 +1,10 @@
+# Static managed policies map - ARNs are hardcoded for faster planning
+# To use data sources instead, set use_managed_policy_data_sources: true in config.yaml
+
+locals {
+  managed_policies_map = {
+    {% for policy in policies %}
+    "{{ policy.PolicyName }}" = "{{ policy.Arn }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

@@ -1,0 +1,8 @@
+{% for user in users %}
+{% if not user.SCIM %}
+import {
+  to = {{ user.ImportTo }}
+  id = "{{ user.ImportId }}"
+}
+{% endif +%}
+{% endfor %}

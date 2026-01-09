@@ -1,0 +1,18 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "{{ aws_provider_version }}"
+    }
+    tfe = {
+      source  = "hashicorp/tfe"
+      version = "{{ tfe_provider_version }}"
+    }
+  }
+}
+
+provider "aws" {
+  region = "{{ region }}"
+}
+
+provider "tfe" {}

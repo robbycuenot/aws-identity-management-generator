@@ -1,0 +1,13 @@
+{% for group in groups %}
+{% if group.SCIM %}
+data "aws_identitystore_group" "{{ group.ResourceName }}" {
+  identity_store_id = local.sso_instance_identity_store_id
+  alternate_identifier {
+    unique_attribute {
+      attribute_path  = "DisplayName"
+      attribute_value = "{{ group.DisplayName }}"
+    }
+  }
+}
+{% endif +%}
+{% endfor %}

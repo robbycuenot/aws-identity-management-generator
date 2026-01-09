@@ -1,0 +1,7 @@
+{% for assignment in assignments %}
+import {
+  to = {{ assignment.ImportTo }}
+  id = "{{ assignment.ImportId }}"
+}
+
+{% endfor %}

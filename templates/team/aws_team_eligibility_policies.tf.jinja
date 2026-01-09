@@ -1,0 +1,32 @@
+{% for policy in eligibility_policies %}
+module "eligibility___{{ policy.ResourceName }}" {
+  source            = "./modules/eligibility"
+  environment_data  = local.eligibility_environment_data
+
+  entity_type   = "{{ policy.type }}"
+  entity_value  = "{{ policy.name }}"
+
+  max_duration  = "{{ policy.duration }}"
+  approval_required = {{ policy.approvalRequired | string | lower }}
+
+  ou_names = [{% if not policy.ous %}]  {% endif %}
+    {% for ou in policy.ous | sort(attribute='name') %} 
+    "{{ ou.name }}"{% if not loop.last %},{% endif %}
+    {% endfor +%}
+  {% if policy.ous %}  ]
+  {% endif %}
+
+  account_names = [{% if not policy.accounts %}]  {% endif %}
+    {% for account in policy.accounts | sort(attribute='name') %} 
+    "{{ account.name }}"{% if not loop.last %},{% endif %}
+    {% endfor +%}
+  {% if policy.accounts %}  ]
+  {% endif %}
+
+  permission_sets = [    {% for permission_set in policy.permissions | sort(attribute='name') %} 
+    "{{ permission_set.name }}"{% if not loop.last %},{% endif %}
+    {% endfor +%}
+  ]
+}
+
+{% endfor %}

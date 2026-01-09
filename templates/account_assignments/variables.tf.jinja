@@ -1,0 +1,17 @@
+# Variables for account_assignments module (local backend mode)
+# These are passed from the root module
+
+variable "users_map" {
+  description = "Map of user names to their Identity Store user IDs"
+  type        = map(string)
+}
+
+variable "groups_map" {
+  description = "Map of group names to their Identity Store group IDs"
+  type        = map(string)
+}
+
+variable "permission_sets_map" {
+  description = "Map of permission set names to their ARNs"
+  type        = map(string)
+}

@@ -1,0 +1,18 @@
+{% for permission_set in permission_sets %}
+resource "aws_ssoadmin_permission_set" "{{ permission_set.ResourceName }}" {
+  instance_arn     = local.sso_instance_arn
+  name             = "{{ permission_set.ResourceName }}"
+  {% if permission_set.Description %}  description      = "{{ permission_set.Description }}"{{'\n'}}{% endif %}
+  {% if permission_set.RelayState %}  relay_state      = "{{ permission_set.RelayState }}"{{'\n'}}{% endif %}
+  session_duration = "{{ permission_set.SessionDuration }}"
+  {% if permission_set.Tags and permission_set.Tags|length > 0 %}
+
+  tags = {
+    {% for tag in permission_set.Tags %}
+    {{ tag.Key }} = "{{ tag.Value }}"
+    {% endfor %}
+  }
+  {% endif %}
+}
+
+{% endfor %}

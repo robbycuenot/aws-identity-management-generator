@@ -1,0 +1,10 @@
+resource "aws_ssoadmin_account_assignment" "controller" {
+  for_each = { for assignment in local.account_assignments_flattened : "${assignment.account_name}___${assignment.permission_set}___${assignment.principal_type}___${assignment.principal}" => assignment }
+
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = data.terraform_remote_state.permission_sets.outputs.permission_sets_map[each.value.permission_set]
+  principal_id       = each.value.principal_type == "USER" ? data.terraform_remote_state.identity_store.outputs.users_map[each.value.principal] : data.terraform_remote_state.identity_store.outputs.groups_map[each.value.principal]
+  principal_type     = each.value.principal_type
+  target_id          = local.account_map[each.value.account_name]
+  target_type        = "AWS_ACCOUNT"
+}

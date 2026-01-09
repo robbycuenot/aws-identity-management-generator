@@ -1,0 +1,6 @@
+data "aws_ssoadmin_instances" "instances" {}
+
+locals {
+    sso_instance_identity_store_id = tolist(data.aws_ssoadmin_instances.instances.identity_store_ids)[0]
+    sso_instance_arn               = tolist(data.aws_ssoadmin_instances.instances.arns)[0]
+}

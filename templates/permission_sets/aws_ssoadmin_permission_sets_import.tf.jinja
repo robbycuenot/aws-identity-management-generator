@@ -1,0 +1,7 @@
+{% for permission_set in permission_sets %}
+import {
+  to = {{ permission_set.ImportTo }}
+  id = "{{ permission_set.ImportId }}"
+}
+
+{% endfor %}

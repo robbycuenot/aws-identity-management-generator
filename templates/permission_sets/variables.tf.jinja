@@ -1,0 +1,7 @@
+# Variables for permission_sets module (local backend mode)
+# These are passed from the root module
+
+variable "managed_policies_map" {
+  description = "Map of managed policy names to their ARNs"
+  type        = map(string)
+}

@@ -1,0 +1,7 @@
+locals {
+  groups_map = {
+    {% for group in groups %}
+    "{{ group.DisplayName }}" = {% if group.SCIM %}data.{% endif %}aws_identitystore_group.{{ group.ResourceName }}.group_id{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

@@ -1,0 +1,5 @@
+data "aws_iam_policy" "managed_policies" {
+  for_each = { for policy in local.managed_policies_list : "${policy}" => policy }
+
+  name = each.value
+}

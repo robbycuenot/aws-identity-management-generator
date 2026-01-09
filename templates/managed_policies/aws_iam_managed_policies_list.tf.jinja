@@ -1,0 +1,7 @@
+locals {
+  managed_policies_list = [
+    {% for policy in policies %}
+    "{{ policy.PolicyName }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  ]
+}

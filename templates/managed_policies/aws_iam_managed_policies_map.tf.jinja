@@ -1,0 +1,7 @@
+locals {
+  managed_policies_map = {
+    {% for policy in policies %}
+    "{{ policy.PolicyName }}" = data.aws_iam_policy.managed_policies["{{ policy.PolicyName }}"].arn{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

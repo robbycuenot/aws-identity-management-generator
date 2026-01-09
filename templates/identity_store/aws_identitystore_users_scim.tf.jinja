@@ -1,0 +1,27 @@
+{# 
+  aws_identitystore_users.tf.jinja
+
+  This template handles a single list of user dicts, mixing SCIM = true (data blocks)
+  and SCIM = false (resource blocks) in the same file, in the order given.
+
+  Variables expected in the template context:
+    - users: List[Dict], each dict must have:
+        "SCIM": bool
+        "ResourceName": str (Terraform-friendly resource name)
+        "UserName": str (the actual username / email)
+        "ImportId": str (like identity_store_id/UserId)
+        # Additional fields can be included for resource logic if needed
+#}
+{% for user in users %}
+{% if user.SCIM %}
+data "aws_identitystore_user" "{{ user.ResourceName }}" {
+  identity_store_id = local.sso_instance_identity_store_id
+  alternate_identifier {
+    unique_attribute {
+      attribute_path  = "UserName"
+      attribute_value = "{{ user.UserName }}"
+    }
+  }
+}
+{% endif +%}
+{% endfor %}

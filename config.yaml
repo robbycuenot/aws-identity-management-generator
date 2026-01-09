@@ -1,0 +1,22 @@
+# IAM Identity Center Generator Configuration
+# 
+# All values can be overridden via CLI flags.
+# Configuration priority: config.yaml < CLI flags
+
+# Common
+verbosity: "normal"                     # -v (quiet/normal/verbose)
+output: "./output"                      # -o
+
+# Mode
+state_mode: "single"                    # -s (single/multi)
+platform: "local"                       # -p (local/tfc)
+
+# TFC Platform (when platform=tfc)
+tfc_org: ""                             # -t
+prefix: "aws-identity-management"       # -x (prefix for project/workspace/role names)
+environment: ""                         # -e (used in TFC and GitHub)
+
+# Features
+enable_team: false                      # -m
+auto_update_providers: true             # -a
+retain_managed_policies: false          # -r (skip managed policy refresh for faster runs)

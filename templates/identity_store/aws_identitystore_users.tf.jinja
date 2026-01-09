@@ -1,0 +1,86 @@
+{# 
+  aws_identitystore_users.tf.jinja
+
+  This template handles a single list of user dicts, mixing SCIM = true (data blocks)
+  and SCIM = false (resource blocks) in the same file, in the order given.
+
+  Variables expected in the template context:
+    - users: List[Dict], each dict must have:
+        "SCIM": bool
+        "ResourceName": str (Terraform-friendly resource name)
+        "UserName": str (the actual username / email)
+        "ImportId": str (like identity_store_id/UserId)
+        # Additional fields can be included for resource logic if needed
+#}
+{% for user in users %}
+{% if not user.SCIM %}
+resource "aws_identitystore_user" "{{ user.ResourceName }}" {
+  identity_store_id = local.sso_instance_identity_store_id
+  user_name         = "{{ user.UserName }}"
+  display_name      = "{{ user.DisplayName }}"
+
+{% set additional_properties_exist = user.Locale 
+                    or user.Nickname or user.PreferredLanguage 
+                    or user.ProfileUrl or user.Timezone 
+                    or user.Title or user.UserType %}
+{% if additional_properties_exist %}
+  {% if user.Locale %}  locale = "{{ user.Locale }}"{{'\n'}}{% endif %}
+  {% if user.Nickname %}  nickname = "{{ user.Nickname }}"{{'\n'}}{% endif %}
+  {% if user.PreferredLanguage %}  preferred_language = "{{ user.PreferredLanguage }}"{{'\n'}}{% endif %}
+  {% if user.ProfileUrl %}  profile_url = "{{ user.ProfileUrl }}"{{'\n'}}{% endif %}
+  {% if user.Timezone %}  timezone = "{{ user.Timezone }}"{{'\n'}}{% endif %}
+  {% if user.Title %}  title = "{{ user.Title }}"{{'\n'}}{% endif %}
+  {% if user.UserType %}  user_type = "{{ user.UserType }}"{{'\n'}}{% endif %}
+
+{% endif %}
+  name {
+    given_name  = "{{ user.Name.GivenName }}"
+    family_name = "{{ user.Name.FamilyName }}"
+    {% if user.Name.Formatted %}    formatted = "{{ user.Name.Formatted }}"{{'\n'}}{% endif %}
+    {% if user.Name.HonorificPrefix %}    honorific_prefix = "{{ user.Name.HonorificPrefix }}"{{'\n'}}{% endif %}
+    {% if user.Name.HonorificSuffix %}    honorific_suffix = "{{ user.Name.HonorificSuffix }}"{{'\n'}}{% endif %}
+    {% if user.Name.MiddleName %}    middle_name = "{{ user.Name.MiddleName }}"{{'\n'}}{% endif %}
+  }
+{% if user.Emails %}
+{% for email in user.Emails %}
+
+  emails {
+  {% if email.Primary %}    primary = {{ email.Primary | lower }}{{'\n'}}{% endif %}
+  {% if email.Type %}    type = "{{ email.Type }}"{{'\n'}}{% endif %}
+    value = "{{ email.Value }}"
+  }
+{% endfor %}
+{% endif %}
+{% if user.Addresses %}
+{% for address in user.Addresses %}
+
+  addresses {
+    {% if address.Country %}    country = "{{ address.Country }}"{{'\n'}}{% endif %}
+    {% if address.Formatted %}    formatted = "{{ address.Formatted }}"{{'\n'}}{% endif %}
+    {% if address.Locality %}    locality = "{{ address.Locality }}"{{'\n'}}{% endif %}
+    {% if address.PostalCode %}    postal_code = "{{ address.PostalCode }}"{{'\n'}}{% endif %}
+    {% if address.Primary %}    primary = {{ address.Primary | lower }}{{'\n'}}{% endif %}
+    {% if address.Region %}    region = "{{ address.Region }}"{{'\n'}}{% endif %}
+    {% if address.StreetAddress %}    street_address = "{{ address.StreetAddress }}"{{'\n'}}{% endif %}
+    {% if address.Type %}    type = "{{ address.Type }}"{{'\n'}}{% endif %}
+  }
+{% endfor %}
+{% endif %}
+{% if user.PhoneNumbers %}
+{% for phone_number in user.PhoneNumbers %}
+
+  phone_numbers {
+  {% if phone_number.Primary %}    primary = {{ phone_number.Primary | lower }}{{'\n'}}{% endif %}
+  {% if phone_number.Type %}    type = "{{ phone_number.Type }}"{{'\n'}}{% endif %}
+    value = "{{ phone_number.Value }}"
+  }
+{% endfor %}
+{% endif %}
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+{% endif %}
+{% endfor %}

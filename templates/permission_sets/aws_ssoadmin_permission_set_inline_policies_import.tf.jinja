@@ -1,0 +1,8 @@
+{% for permission_set in permission_sets %}
+{% if permission_set.HasInlinePolicy %}
+import {
+  to = {{ module_prefix }}aws_ssoadmin_permission_set_inline_policy.controller["{{ permission_set.ResourceName }}"]
+  id = "{{ permission_set.ImportId }}"
+}
+{% endif +%}
+{% endfor %}

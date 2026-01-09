@@ -1,0 +1,43 @@
+# TEAM Application Assignments
+# Assigns users and groups to the TEAM Identity Center application
+# Generated from current AWS state
+
+locals {
+  # Users assigned to TEAM application
+  team_users = [
+    {% for user in team_users %}
+    "{{ user }}",
+    {% endfor %}
+  ]
+  
+  # Groups assigned to TEAM application
+  team_groups = [
+    {% for group in team_groups %}
+    "{{ group }}",
+    {% endfor %}
+  ]
+}
+
+# Assign users to TEAM application
+module "team_app_assignment_users" {
+  for_each = toset(local.team_users)
+  
+  source = "./team_app_assignment"
+
+  principal_name        = each.value
+  principal_type        = "USER"
+  sso_identity_store_id = local.sso_identity_store_id
+  team_application_arn  = data.aws_ssoadmin_application.team.application_arn
+}
+
+# Assign groups to TEAM application
+module "team_app_assignment_groups" {
+  for_each = toset(local.team_groups)
+  
+  source = "./team_app_assignment"
+
+  principal_name        = each.value
+  principal_type        = "GROUP"
+  sso_identity_store_id = local.sso_identity_store_id
+  team_application_arn  = data.aws_ssoadmin_application.team.application_arn
+}

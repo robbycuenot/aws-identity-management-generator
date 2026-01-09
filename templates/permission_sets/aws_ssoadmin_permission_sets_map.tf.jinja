@@ -1,0 +1,7 @@
+locals {
+  permission_sets_map = {
+    {% for permission_set in permission_sets %}
+    "{{ permission_set.Name }}" = aws_ssoadmin_permission_set.{{ permission_set.ResourceName }}.arn{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

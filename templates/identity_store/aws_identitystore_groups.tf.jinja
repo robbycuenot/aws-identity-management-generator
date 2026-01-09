@@ -1,0 +1,13 @@
+{% for group in groups %}
+{% if not group.SCIM %}
+resource "aws_identitystore_group" "{{ group.ResourceName }}" {
+  display_name      = "{{ group.DisplayName }}"
+  {% if group.Description %}  description       = "{{ group.Description }}"{{'\n'}}{% endif %}
+  identity_store_id = local.sso_instance_identity_store_id
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+{% endif +%}
+{% endfor %}

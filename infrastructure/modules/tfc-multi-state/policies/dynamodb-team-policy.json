@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ModifyTEAMDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Get*",
+        "dynamodb:DeleteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:Describe*",
+        "dynamodb:List*",
+        "dynamodb:PartiQLSelect"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:${identity_center_region}:${identity_center_account_id}:table/Eligibility-*-main",
+        "arn:aws:dynamodb:${identity_center_region}:${identity_center_account_id}:table/Approvers-*-main",
+        "arn:aws:dynamodb:${identity_center_region}:${identity_center_account_id}:table/Settings-*-main"
+      ]
+    }
+  ]
+}

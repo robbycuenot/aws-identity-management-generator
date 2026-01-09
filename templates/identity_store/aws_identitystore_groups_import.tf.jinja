@@ -1,0 +1,8 @@
+{% for group in groups %}
+{% if not group.SCIM %}
+import {
+  to = {{ group.ImportTo }}
+  id = "{{ group.ImportId }}"
+}
+{% endif +%}
+{% endfor %}

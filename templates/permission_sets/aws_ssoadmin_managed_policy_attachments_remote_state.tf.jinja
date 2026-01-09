@@ -1,0 +1,10 @@
+resource "aws_ssoadmin_managed_policy_attachment" "controller" {
+  for_each = { 
+    for attachment in local.permission_set_managed_policy_attachments_flattened : 
+    "${attachment.permission_set}___${attachment.managed_policy}" => attachment 
+  }
+
+  instance_arn         = local.sso_instance_arn
+  managed_policy_arn   = data.terraform_remote_state.managed_policies.outputs.managed_policies_map[each.value.managed_policy]
+  permission_set_arn   = local.permission_sets_map[each.value.permission_set]
+}

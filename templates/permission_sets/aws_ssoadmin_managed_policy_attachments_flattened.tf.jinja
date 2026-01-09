@@ -1,0 +1,10 @@
+locals {
+  permission_set_managed_policy_attachments_flattened = flatten([
+    for permission_set, managed_policies in local.permission_set_managed_policy_attachments_map : [
+      for managed_policy in managed_policies : {
+        "permission_set" = permission_set
+        "managed_policy" = managed_policy
+      }
+    ]
+  ])
+}

@@ -1,0 +1,24 @@
+# Root providers configuration for single-workspace TFC deployment
+
+terraform {
+  required_version = ">= 1.0"
+
+  cloud {
+    organization = "{{ tfe_organization }}"
+
+    workspaces {
+      name = "{{ workspace_name }}"
+    }
+  }
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> {{ aws_provider_version }}"
+    }
+  }
+}
+
+provider "aws" {
+  region = "{{ region }}"
+}

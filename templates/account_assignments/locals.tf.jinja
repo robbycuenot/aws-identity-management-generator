@@ -1,0 +1,7 @@
+locals {
+  account_map = {
+    {% for account in accounts %}
+    "{{ account.OriginalName }}" = "{{ account.Id }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

@@ -1,0 +1,20 @@
+# Generated Terraform file for AWS IAM Identity Center
+locals {
+  account_assignments_map = {
+    {% for account_name, permsets in account_assignments_map.items() %}
+    "{{ account_name }}" = {
+      {% for ps_name, entity_dict in permsets.items() %}
+      "{{ ps_name }}" = {
+        {% for principal_type, principal_names in entity_dict.items() %}
+        "{{ principal_type }}" = [
+          {% for name in principal_names %}
+          "{{ name }}"{% if not loop.last %},{% endif +%}
+          {% endfor %}
+        ]{% if not loop.last %},{% endif +%}
+        {% endfor %}
+      }{% if not loop.last %},{% endif +%}
+      {% endfor %}
+    }{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

@@ -1,0 +1,16 @@
+# Root providers configuration for single-workspace local deployment
+
+terraform {
+  required_version = ">= 1.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> {{ aws_provider_version }}"
+    }
+  }
+}
+
+provider "aws" {
+  region = "{{ region }}"
+}

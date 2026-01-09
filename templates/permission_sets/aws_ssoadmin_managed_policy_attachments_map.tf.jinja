@@ -1,0 +1,11 @@
+locals {
+  permission_set_managed_policy_attachments_map = {
+    {% for ps_name, policy_list in attachments.items() %}
+    "{{ ps_name }}" = [
+      {% for policy in policy_list %}
+      "{{ policy.Name }}"{% if not loop.last %},{% endif +%}
+      {% endfor %}
+    ]{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

@@ -1,0 +1,7 @@
+locals {
+  users_map = {
+    {% for user in users %}
+    "{{ user.UserName }}" = {% if user.SCIM %}data.{% endif %}aws_identitystore_user.{{ user.ResourceName }}.user_id{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

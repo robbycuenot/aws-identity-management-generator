@@ -1,0 +1,10 @@
+{% for group, members in memberships.items() %}
+  {% for member in members %}
+    {% if not member.SCIM %}
+import {
+  to = {{ member.ImportTo}}
+  id = "{{ member.ImportId }}"
+}
+    {% endif +%}
+  {% endfor %}
+{% endfor %}

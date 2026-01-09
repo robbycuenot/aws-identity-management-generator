@@ -1,0 +1,8 @@
+resource "aws_identitystore_group_membership" "controller" {
+  for_each = { for membership in local.group_memberships_flattened : "${membership.group}___${membership.user}" => membership }
+
+  group_id = local.groups_map[each.value.group]
+  member_id  = local.users_map[each.value.user]
+
+  identity_store_id = local.sso_instance_identity_store_id
+}

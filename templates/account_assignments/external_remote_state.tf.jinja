@@ -1,0 +1,16 @@
+# Remote state references for multi-state local mode
+# Reads outputs from identity_store and permission_sets components
+
+data "terraform_remote_state" "identity_store" {
+  backend = "local"
+  config = {
+    path = "../identity_store/terraform.tfstate"
+  }
+}
+
+data "terraform_remote_state" "permission_sets" {
+  backend = "local"
+  config = {
+    path = "../permission_sets/terraform.tfstate"
+  }
+}

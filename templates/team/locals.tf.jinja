@@ -1,0 +1,47 @@
+locals {
+  account_map = {
+    {% for account in accounts %}
+    "{{ account.OriginalName }}" = "{{ account.Id }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+
+  ou_map = {
+    {% for ou in organizational_units %}
+    "{{ ou.FullPath }}" = "{{ ou.Id }}"{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+
+  account_map_by_name = {
+    for account in data.aws_organizations_organization.org.non_master_accounts :
+      account.name => account if account.status != "SUSPENDED"
+  }
+
+  ou_map_by_name = merge(
+    { for ou in data.aws_organizations_organizational_units.level_1_ous.children : ou.name => ou },
+    { for i, ou in flatten([for ous in data.aws_organizations_organizational_units.level_2_ous : ous.children]) : ou.name => ou },
+    { for i, ou in flatten([for ous in data.aws_organizations_organizational_units.level_3_ous : ous.children]) : ou.name => ou },
+    { for i, ou in flatten([for ous in data.aws_organizations_organizational_units.level_4_ous : ous.children]) : ou.name => ou },
+    { for i, ou in flatten([for ous in data.aws_organizations_organizational_units.level_5_ous : ous.children]) : ou.name => ou }
+  )
+  
+  sso_instance = tolist(data.aws_ssoadmin_instances.instances.arns)[0]
+  sso_identity_store_id = tolist(data.aws_ssoadmin_instances.instances.identity_store_ids)[0]
+
+  eligibility_environment_data = {
+    account_map_by_name = local.account_map_by_name
+    ou_map_by_name = local.ou_map_by_name
+    root_id = data.aws_organizations_organization.org.roots[0].id
+    sso_identity_store_id = local.sso_identity_store_id
+    sso_instance = local.sso_instance
+    table = data.aws_dynamodb_table.eligibility_table
+  }
+
+  approver_environment_data = {
+    account_map_by_name = local.account_map_by_name
+    ou_map_by_name = local.ou_map_by_name
+    root_id = data.aws_organizations_organization.org.roots[0].id
+    sso_identity_store_id = local.sso_identity_store_id
+    sso_instance = local.sso_instance
+    table = data.aws_dynamodb_table.approvers_table
+  }
+}

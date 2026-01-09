@@ -1,0 +1,54 @@
+{# 
+  The template below loops over the provided DynamoDB tables.
+  For any table whose name matches the Approvers pattern, it outputs
+  a data block for the approvers table; for any table matching the Eligibility
+  pattern, it outputs a data block for the eligibility table.
+#}
+
+{% for table in dynamodb_tables %}
+  {% if table.Table.TableName.startswith("Approvers-") and table.Table.TableName.endswith("-main") %}
+data "aws_dynamodb_table" "approvers_table" {
+  name = "{{ table.Table.TableName }}"
+}
+  {% elif table.Table.TableName.startswith("Eligibility-") and table.Table.TableName.endswith("-main") %}
+data "aws_dynamodb_table" "eligibility_table" {
+  name = "{{ table.Table.TableName }}"
+}
+  {% endif %}
+{% endfor %}
+
+data "aws_organizations_organization" "org" {}
+
+# TEAM IDC APP application
+data "aws_ssoadmin_application" "team" {
+  application_arn = "{{ team_application_arn }}"
+}
+
+# Fetch the root OUs
+data "aws_organizations_organizational_units" "level_1_ous" {
+  parent_id = data.aws_organizations_organization.org.roots[0].id
+}
+
+# Fetch level 2 OUs
+data "aws_organizations_organizational_units" "level_2_ous" {
+  count     = length(data.aws_organizations_organizational_units.level_1_ous.children)
+  parent_id = data.aws_organizations_organizational_units.level_1_ous.children[count.index].id
+}
+
+# Fetch level 3 OUs
+data "aws_organizations_organizational_units" "level_3_ous" {
+  count     = length(flatten([for ous in data.aws_organizations_organizational_units.level_2_ous : ous.children]))
+  parent_id = flatten([for ous in data.aws_organizations_organizational_units.level_2_ous : ous.children])[count.index].id
+}
+
+# Fetch level 4 OUs
+data "aws_organizations_organizational_units" "level_4_ous" {
+  count     = length(flatten([for ous in data.aws_organizations_organizational_units.level_3_ous : ous.children]))
+  parent_id = flatten([for ous in data.aws_organizations_organizational_units.level_3_ous : ous.children])[count.index].id
+}
+
+# Fetch level 5 OUs
+data "aws_organizations_organizational_units" "level_5_ous" {
+  count     = length(flatten([for ous in data.aws_organizations_organizational_units.level_4_ous : ous.children]))
+  parent_id = flatten([for ous in data.aws_organizations_organizational_units.level_4_ous : ous.children])[count.index].id
+}

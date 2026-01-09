@@ -1,0 +1,16 @@
+locals {
+  account_assignments_flattened = flatten([
+    for account_name, permissions in local.account_assignments_map : [
+      for permission_set, principals in permissions : [
+        for principal_type, principal_list in principals : [
+          for principal in principal_list : {
+            principal_type  = principal_type
+            principal       = principal
+            account_name    = account_name
+            permission_set  = permission_set
+          }
+        ]
+      ]
+    ]
+  ])
+}

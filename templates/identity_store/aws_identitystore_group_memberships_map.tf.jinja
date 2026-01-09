@@ -1,0 +1,11 @@
+locals {
+  group_memberships_map = {
+    {% for group, members in memberships.items() %}
+    "{{ group }}" = [
+      {% for member in members %}
+      "{{ member.OriginalName }}"{% if not loop.last %},{% endif +%}
+      {% endfor %}
+    ]{% if not loop.last %},{% endif +%}
+    {% endfor %}
+  }
+}

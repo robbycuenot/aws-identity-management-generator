@@ -1,0 +1,9 @@
+# Remote state reference for multi-state local mode
+# Reads outputs from the managed_policies component
+
+data "terraform_remote_state" "managed_policies" {
+  backend = "local"
+  config = {
+    path = "../managed_policies/terraform.tfstate"
+  }
+}
