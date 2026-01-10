@@ -337,10 +337,10 @@ resource "github_actions_environment_variable" "generator_repo_name" {
   value         = var.github_generator_repo
 }
 
-resource "github_actions_environment_variable" "repo_owner" {
+resource "github_actions_environment_variable" "generator_repo_owner" {
   repository    = var.github_repo
   environment   = github_repository_environment.identity_management.environment
-  variable_name = "REPO_OWNER"
+  variable_name = "GENERATOR_REPO_OWNER"
   value         = var.github_owner
 }
 
@@ -377,6 +377,13 @@ resource "github_actions_environment_variable" "prefix" {
   environment   = github_repository_environment.identity_management.environment
   variable_name = "PREFIX"
   value         = var.prefix
+}
+
+resource "github_actions_environment_variable" "retain_managed_policies" {
+  repository    = var.github_repo
+  environment   = github_repository_environment.identity_management.environment
+  variable_name = "RETAIN_MANAGED_POLICIES"
+  value         = tostring(var.retain_managed_policies)
 }
 
 # ============================================================================

@@ -34,6 +34,12 @@ variable "auto_update_providers" {
   default     = true
 }
 
+variable "retain_managed_policies" {
+  description = "Retain existing managed policies (skip refresh for faster runs)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Environment
 # =============================================================================

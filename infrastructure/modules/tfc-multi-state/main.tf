@@ -588,10 +588,10 @@ resource "github_actions_environment_variable" "generator_repo_name" {
 # This variable stores the GitHub organization or user that owns the repositories
 # The generator workflow uses this to construct the full repository path for checkout
 # Requirements: 5.3
-resource "github_actions_environment_variable" "repo_owner" {
+resource "github_actions_environment_variable" "generator_repo_owner" {
   repository    = var.github_repo
   environment   = github_repository_environment.identity_management.environment
-  variable_name = "REPO_OWNER"
+  variable_name = "GENERATOR_REPO_OWNER"
   value         = var.github_owner
 }
 
@@ -649,6 +649,16 @@ resource "github_actions_environment_variable" "prefix" {
   environment   = github_repository_environment.identity_management.environment
   variable_name = "PREFIX"
   value         = var.prefix
+}
+
+# GitHub Actions Variable - Retain Managed Policies
+# Creates a GitHub Actions variable scoped to the environment
+# This variable controls whether to skip refreshing managed policies for faster runs
+resource "github_actions_environment_variable" "retain_managed_policies" {
+  repository    = var.github_repo
+  environment   = github_repository_environment.identity_management.environment
+  variable_name = "RETAIN_MANAGED_POLICIES"
+  value         = tostring(var.retain_managed_policies)
 }
 
 # ============================================================================

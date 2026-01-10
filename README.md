@@ -2,74 +2,150 @@
 
 Automated Terraform code generation for AWS IAM Identity Center.
 
-> **Companion Repository:** [aws-identity-management](https://github.com/robbycuenot/aws-identity-management) - The output repository where generated Terraform configurations are stored and applied. Use both repositories together for a complete IAM Identity Center management solution.
+> **Companion Repository:** [aws-identity-management](https://github.com/robbycuenot/aws-identity-management) - The output repository where generated Terraform configurations are stored and applied.
 
 This tool reverse-generates the current AWS IAM Identity Center state into structured Terraform HCL, addressing challenges that come with maintaining a system modified by multiple sources (SCIM, AWS console, Account Factory, break-glass scenarios, etc.).
 
-## Overview
-
-The generator:
-- Fetches current AWS IAM Identity Center state using boto3
-- Generates Terraform configurations using Jinja2 templates
-- Creates import statements for seamless resource adoption
-- Supports local execution, containers, GitHub Actions, and Terraform Cloud
-
 ## Quick Start
 
-**For development:** Start with [Local Development](#local-development) or [Container](#container).
+Get running in 5 minutes with Codespaces - no local setup required.
 
-**For production:** Use [Terraform Cloud](infrastructure/README.md) for team environments, or [GitHub Actions](#github-actions) for automated runs.
+**1. Launch Codespaces:**
 
-### Single vs Multi-State Mode
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/robbycuenot/aws-identity-management-generator)
 
-- **Single state** (`-s single`, default): One Terraform state file, one `terraform apply`. Simpler to manage.
-- **Multi state** (`-s multi`): Separate state per component. Better for large environments (1000+ assignments).
+   - Click the badge above, or go to [the repo](https://github.com/robbycuenot/aws-identity-management-generator) → Code → Codespaces → Create codespace
+   - Wait for the environment to build (~2 minutes)
 
----
-
-## Prerequisites
-
-1. **AWS IAM Identity Center** enabled in your AWS account
-2. **Delegated administrator account** strongly recommended (keeps Identity Center management separate from the management account)
-3. **Read-only access** via a permission set or IAM role
-
-### Recommended Permission Set
-
-Create `AWSIdentityMgmtGeneratorReadOnly` with these AWS managed policies:
-
-| Policy | Purpose |
-|--------|---------|
-| `AWSSSOReadOnly` | Read IAM Identity Center configuration |
-| `AWSSSODirectoryReadOnly` | Read Identity Store (users, groups) |
-| `IAMReadOnlyAccess` | Read IAM managed policies |
-| `AmazonDynamoDBReadOnlyAccess` | *(Optional)* Only needed if using TEAM |
-
-**Quick Setup via CloudShell:**
-
+**2. Create the read-only permission set** (run in AWS CloudShell on your Identity Center account):
 ```bash
 curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-generator/main/scripts/create_permission_set.sh | bash
 ```
 
-### Getting AWS Credentials
+**3. Get AWS credentials:**
+   - Go to your AWS access portal
+   - Select the Identity Center account → `AWSIdentityMgmtGeneratorReadOnly`
+   - Copy the environment variables and paste into the Codespaces terminal
+   - If your Identity Center region is not `us-east-1`, run: `export AWS_REGION=<your-region>`
 
-1. Go to your AWS access portal
-2. Select the account where IAM Identity Center is deployed
-3. Choose the `AWSIdentityMgmtGeneratorReadOnly` permission set
-4. Click "Command line or programmatic access"
-5. Copy the environment variables and paste into your terminal
+**4. Run the generator:**
+```bash
+python3 scripts/iam_identity_center_generator.py -v normal -o output
+```
+
+Your Terraform code is now in `output/`. Run `terraform init && terraform apply` to manage Identity Center as code.
+
+**For ongoing automation**, see [GitHub Actions](#github-actions) to set up automatic PR generation on a schedule.
 
 ---
 
-## Local Development
+## How It Works
 
-### Requirements
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  AWS Identity   │────▶│    Generator    │────▶│   Terraform     │
+│     Center      │     │  (this repo)    │     │   Code (.tf)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+                                                ┌─────────────────┐
+                                                │ terraform apply │
+                                                └─────────────────┘
+```
 
-- Python 3.13+
-- AWS CLI v2
-- Terraform CLI
+The generator reads your current AWS state and produces Terraform configurations. You then apply those configurations to manage Identity Center as code.
 
-### Setup
+---
 
+## Running the Generator
+
+Choose how to run the generator based on your needs:
+
+| Method | Best For | Setup Effort |
+|--------|----------|--------------|
+| [Codespaces](#codespaces) | Quick start, no local setup | Lowest |
+| [GitHub Actions](#github-actions) | Automation, teams, PRs | Low |
+| [Local Python](#local-python) | Development, debugging | Medium |
+| [Container](#container) | CI/CD, air-gapped environments | Low |
+
+### Codespaces
+
+Zero local setup - runs entirely in the browser. Great for quick testing or when you can't install dependencies locally.
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/robbycuenot/aws-identity-management-generator)
+
+1. Click the badge above or go to Code → Codespaces → Create codespace
+2. Wait for the environment to build (includes Python, AWS CLI, Terraform)
+3. Get AWS credentials (see [Prerequisites](#permission-set-for-local-development) to create the permission set, then copy credentials from your access portal)
+4. Run the generator:
+
+```bash
+cd scripts
+python3 iam_identity_center_generator.py -v normal -o ../output
+```
+
+The devcontainer is pre-configured with all dependencies.
+
+### GitHub Actions
+
+The recommended approach for ongoing use. Runs automatically, creates PRs with changes.
+
+**Setup:**
+
+1. **Import the output repository** (don't fork - output contains identity data):
+   - Go to [github.com/new/import](https://github.com/new/import)
+   - Import `https://github.com/robbycuenot/aws-identity-management` as a private repo
+
+2. **Create a GitHub environment:**
+   - Go to your repo → Settings → Environments → New environment
+   - Name it `production` (or your preferred name)
+
+3. **Set up AWS OIDC** (run in CloudShell on your Identity Center account):
+   ```bash
+   export GITHUB_ORG="your-org-or-username"
+   export GITHUB_REPO="aws-identity-management"  # or your repo name
+   export GITHUB_ENV="production"                 # must match step 2
+
+   curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-generator/main/scripts/create_github_oidc.sh | bash
+   ```
+
+4. **Add the output values** to your GitHub environment variables:
+   - `AWS_ROLE_ARN` - from script output
+   - `AWS_REGION` - where Identity Center is configured (e.g., `us-east-1`)
+
+5. **Run the workflow:**
+   - Go to Actions → "IAM Identity Center Generator" → Run workflow
+   - Select your environment and click "Run workflow"
+   - Review and merge the generated PR
+
+**Advanced configuration:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AWS_REGION` | *(required)* | AWS region for Identity Center |
+| `AWS_ROLE_ARN` | *(required)* | OIDC role ARN |
+| `GENERATOR_REPO_OWNER` | `robbycuenot` | Generator repo owner |
+| `GENERATOR_REPO_NAME` | `aws-identity-management-generator` | Generator repo name |
+| `STATE_MODE` | `single` | `single` or `multi` |
+| `PLATFORM` | `local` | `local` or `tfc` |
+| `OUTPUT` | `.` | Output directory |
+| `PREFIX` | `aws-identity-management` | Naming prefix (TFC) |
+| `ENABLE_TEAM` | `false` | Enable TEAM support |
+| `RETAIN_MANAGED_POLICIES` | `false` | Skip managed policy refresh |
+
+**Using a private generator fork:**
+1. Import the generator repo privately
+2. Generate an SSH deploy key and add to generator repo
+3. Add private key as `GENERATOR_DEPLOY_KEY` secret
+4. Set `GENERATOR_REPO_OWNER` to your org
+
+### Local Python
+
+Best for development, debugging, or one-off runs.
+
+**Requirements:** Python 3.13+, AWS CLI v2, Terraform CLI
+
+**Setup:**
 ```bash
 git clone https://github.com/robbycuenot/aws-identity-management-generator.git
 cd aws-identity-management-generator
@@ -81,33 +157,27 @@ source scripts/activate_env.sh
 .\scripts\activate_env.ps1
 ```
 
-### Run
+**Get AWS credentials:**
+1. Go to your AWS access portal
+2. Select the Identity Center account
+3. Choose `AWSIdentityMgmtGeneratorReadOnly` (or create it - see [Prerequisites](#prerequisites))
+4. Copy environment variables to your terminal
 
+**Run:**
 ```bash
 cd scripts
 python3 iam_identity_center_generator.py -v normal -o ../output
-
-# With TEAM support
-python3 iam_identity_center_generator.py -v normal -o ../output -m true
-
-# Multi-state mode
-python3 iam_identity_center_generator.py -v normal -o ../output -s multi
 ```
 
-### Apply
-
+**Apply:**
 ```bash
 cd ../output
-terraform init
-terraform plan
-terraform apply
+terraform init && terraform plan && terraform apply
 ```
 
----
+### Container
 
-## Container
-
-No local dependencies required.
+No local dependencies required. Good for CI/CD pipelines or air-gapped environments.
 
 ```bash
 docker pull ghcr.io/robbycuenot/aws-identity-management-generator:latest
@@ -124,55 +194,111 @@ docker run --rm \
 
 ---
 
-## GitHub Actions (Manual Setup)
+## State Management
 
-Automate the generator with GitHub Actions using OIDC authentication.
+Where your Terraform state lives after running `terraform apply`.
 
-1. Create private copies of both repositories via [GitHub Import](https://github.com/new/import) (do not fork - generated output contains sensitive identity data):
-   - Import `robbycuenot/aws-identity-management-generator` as a private repo
-   - Import `robbycuenot/aws-identity-management` as a private repo
-   - Both repos include a `sync-from-upstream.yaml` workflow to pull updates from upstream via PR
+| Platform | Backend | Use Case |
+|----------|---------|----------|
+| `local` (default) | Local filesystem | Simple setups, manual applies |
+| `tfc` | Terraform Cloud | Teams, remote state, automated applies |
 
-2. Choose a GitHub environment name (e.g., `production`). Create this environment on the `aws-identity-management` repository under Settings → Environments. All secrets and variables will be configured in this environment. (The generator workflow runs from the identity-management repo, so the environment is only needed there.)
+### Local Backend
 
-3. Create an IAM OIDC provider and role for GitHub Actions with the same permissions as the permission set above. **Important:** The trust policy must reference the GitHub environment name and the `aws-identity-management` repo, not the generator repo. Example subject claim: `repo:your-org/aws-identity-management:environment:production`
+State is stored on whatever machine runs `terraform apply`. Generated code is committed to git, but `.tfstate` files are gitignored.
 
-4. Configure GitHub environment variables in the `production` environment on `aws-identity-management`:
-   - `AWS_ROLE_ARN` - ARN of the OIDC role created in step 3
-   - `AWS_REGION` - Region where IAM Identity Center is configured
-   - `STATE_MODE` - `single` or `multi`
-   - `PLATFORM` - `local` or `tfc`
-   - `OUTPUT` - Output directory (typically `./output`)
-   - `ENABLE_TEAM` - `true` or `false`
+This is the default and requires no additional setup.
 
-5. Add the `GENERATOR_DEPLOY_KEY` secret to the environment (required to clone the private generator repo). Generate a deploy key for your generator repo and add the private key here.
+### Terraform Cloud
 
-6. See the [example workflow](https://github.com/robbycuenot/aws-identity-management/blob/main/.github/workflows/iam_identity_center_generator.yaml) for reference.
+For team environments with remote state and automated applies.
 
-If using the [infrastructure module](infrastructure/README.md), steps 3-5 are handled automatically.
+**Option 1: Infrastructure Module** (recommended)
+- Automates TFC workspace, OIDC, and GitHub environment setup
+- See [infrastructure module documentation](infrastructure/README.md)
 
----
+**Option 2: Manual Configuration**
+- Create TFC workspace(s) manually
+- Set `PLATFORM=tfc`, `TFC_ORG`, and `TFC_ENVIRONMENT` variables
+- Configure OIDC authentication
 
-## Terraform Cloud
-
-For full automation with remote state and OIDC authentication, see the [infrastructure module documentation](infrastructure/README.md).
+**Note:** The generator regenerates `providers.tf` on each run, so custom backend configurations (like S3) would be overwritten. Use TFC or wrap the output in a parent module with your own backend.
 
 ---
 
-## CLI Reference
+## Prerequisites
+
+### AWS Requirements
+
+1. **AWS IAM Identity Center** enabled
+2. **Delegated administrator account** recommended (keeps Identity Center separate from management account)
+3. **Read-only access** via permission set or IAM role
+
+### Permission Set for Local Development
+
+Create `AWSIdentityMgmtGeneratorReadOnly` with these AWS managed policies:
+
+| Policy | Purpose |
+|--------|---------|
+| `AWSSSOReadOnly` | Read IAM Identity Center configuration |
+| `AWSSSODirectoryReadOnly` | Read Identity Store (users, groups) |
+| `IAMReadOnlyAccess` | Read IAM managed policies |
+| `AmazonDynamoDBReadOnlyAccess` | *(Optional)* Only if using TEAM |
+
+Plus an inline policy for Identity Store lookups (not covered by managed policies):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": ["identitystore:GetGroupId", "identitystore:GetUserId", "identitystore:GetGroupMembershipId"],
+    "Resource": "*"
+  }]
+}
+```
+
+**Quick setup via CloudShell:**
+```bash
+curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-generator/main/scripts/create_permission_set.sh | bash
+```
+
+---
+
+## Configuration Options
+
+### Single vs Multi-State Mode
+
+| Mode | Workspaces | Use Case |
+|------|------------|----------|
+| `single` (default) | 1 | Most environments, simpler management |
+| `multi` | 5 | Large environments (1000+ assignments) |
+
+### CLI Reference
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `-v, --verbosity` | Output level: `quiet`, `normal`, `verbose` | `normal` |
+| `-v, --verbosity` | `quiet`, `normal`, `verbose` | `normal` |
 | `-o, --output` | Output directory | `./output` |
 | `-s, --state-mode` | `single` or `multi` | `single` |
 | `-p, --platform` | `local` or `tfc` | `local` |
-| `-t, --tfc-org` | TFC organization (requires `-p tfc`) | - |
-| `-x, --prefix` | Prefix for naming (requires `-p tfc`) | `aws-identity-management` |
-| `-e, --environment` | Environment name (requires `-p tfc`) | - |
+| `-t, --tfc-org` | TFC organization | - |
+| `-x, --prefix` | Naming prefix | `aws-identity-management` |
+| `-e, --environment` | Environment name | - |
 | `-m, --enable-team` | Enable TEAM support | `false` |
-| `-a, --auto-update-providers` | Auto-update provider versions | `true` |
-| `-r, --retain-managed-policies` | Skip managed policy refresh | `false` |
+| `-a, --auto-update-providers` | Auto-update providers | `true` |
+| `-r, --retain-managed-policies` | Skip policy refresh | `false` |
+
+### AWS TEAM Support
+
+[AWS TEAM (Temporary Elevated Access Management)](https://aws-samples.github.io/iam-identity-center-team/) provides just-in-time, approval-based temporary access. Enable with `-m true` or `ENABLE_TEAM=true`.
+
+⚠️ **Import limitation:** TEAM eligibility and approver policies are stored in DynamoDB and cannot be imported into Terraform. For existing TEAM deployments:
+
+1. Run the generator with `-m true` to create Terraform code
+2. Delete existing policies in the TEAM console
+3. Run `terraform apply` to recreate them under Terraform management
+
+This is a one-time migration step.
 
 ### config.yaml
 
@@ -186,14 +312,13 @@ auto_update_providers: true
 retain_managed_policies: false
 ```
 
-Priority: CLI flags > config.yaml > defaults
+Priority: CLI flags > environment variables > config.yaml > defaults
 
 ---
 
 ## Generated Output
 
 ### Single-State Mode
-
 ```
 output/
 ├── main.tf
@@ -206,7 +331,6 @@ output/
 ```
 
 ### Multi-State Mode
-
 ```
 output/
 ├── identity_store/      # Apply first
@@ -223,14 +347,12 @@ Apply order: `identity_store` & `managed_policies` → `permission_sets` → `ac
 ## Development Tips
 
 ```bash
-# Fetch AWS state once (slow)
+# Fetch AWS state once (slow), then iterate on generation (fast)
 python3 iam_identity_center_generator.py fetch -v normal
-
-# Iterate on generation (fast)
 python3 iam_identity_center_generator.py generate -v normal -o ../output
 
 # Skip managed policy refresh for faster runs
-python3 iam_identity_center_generator.py -r true -v normal -o ../output
+python3 iam_identity_center_generator.py -r true -o ../output
 ```
 
 Customize templates in `templates/` or extend `phase1_fetch.py` / `phase2_generate.py`.
@@ -249,6 +371,12 @@ Customize templates in `templates/` or extend `phase1_fetch.py` / `phase2_genera
 
 **Rate limiting**
 - Use `-r true` to skip managed policy refresh
+
+---
+
+## Keeping Up to Date
+
+Both repos include a `sync-from-upstream.yaml` workflow that creates PRs to pull updates from the upstream public repos.
 
 ---
 

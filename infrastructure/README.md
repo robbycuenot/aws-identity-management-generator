@@ -25,15 +25,15 @@ Terraform module that deploys the infrastructure required to run the AWS IAM Ide
 
 ## Prerequisites
 
-1. Fork both repositories to your organization:
-   - `aws-identity-management-generator`
-   - `aws-identity-management`
+1. Import both repositories to your organization via [github.com/new/import](https://github.com/new/import) (don't fork - output contains identity data):
+   - `https://github.com/robbycuenot/aws-identity-management-generator`
+   - `https://github.com/robbycuenot/aws-identity-management`
 
-2. Create a GitHub Personal Access Token (fine-grained) with permissions:
+2. Create a GitHub Personal Access Token (fine-grained) with permissions on **both repositories** (`aws-identity-management` and `aws-identity-management-generator`):
    - Metadata: Read
    - Actions: Read and write
    - Actions variables: Read and write
-   - Administration: Read and write
+   - Administration: Read and write (for deploy keys on generator repo)
    - Environments: Read and write
    - Secrets: Read and write
 

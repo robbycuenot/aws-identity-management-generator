@@ -78,6 +78,29 @@ aws sso-admin attach-managed-policy-to-permission-set \
   --permission-set-arn "$PERMISSION_SET_ARN" \
   --managed-policy-arn "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess" 2>/dev/null || true
 
+# Add inline policy for identitystore actions not covered by AWSSSODirectoryReadOnly
+echo "Adding inline policy for Identity Store read access..."
+INLINE_POLICY='{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IdentityStoreReadAccess",
+      "Effect": "Allow",
+      "Action": [
+        "identitystore:GetGroupId",
+        "identitystore:GetUserId",
+        "identitystore:GetGroupMembershipId"
+      ],
+      "Resource": "*"
+    }
+  ]
+}'
+
+aws sso-admin put-inline-policy-to-permission-set \
+  --instance-arn "$INSTANCE_ARN" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --inline-policy "$INLINE_POLICY" 2>/dev/null || true
+
 # Look up your user ID
 echo "Looking up user in Identity Store..."
 USER_ID=$(aws identitystore list-users \

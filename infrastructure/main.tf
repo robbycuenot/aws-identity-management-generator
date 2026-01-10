@@ -17,10 +17,11 @@ module "tfc_multi_state" {
   }
 
   # Generator parameters (match CLI flags)
-  verbosity             = var.verbosity
-  output                = var.output
-  enable_team           = var.enable_team
-  auto_update_providers = var.auto_update_providers
+  verbosity               = var.verbosity
+  output                  = var.output
+  enable_team             = var.enable_team
+  auto_update_providers   = var.auto_update_providers
+  retain_managed_policies = var.retain_managed_policies
 
   # Environment
   environment = var.environment
@@ -54,10 +55,11 @@ module "tfc_single_state" {
   }
 
   # Generator parameters (match CLI flags)
-  verbosity             = var.verbosity
-  output                = var.output
-  enable_team           = var.enable_team
-  auto_update_providers = var.auto_update_providers
+  verbosity               = var.verbosity
+  output                  = var.output
+  enable_team             = var.enable_team
+  auto_update_providers   = var.auto_update_providers
+  retain_managed_policies = var.retain_managed_policies
 
   # Environment
   environment = var.environment
