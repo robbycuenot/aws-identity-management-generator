@@ -244,6 +244,7 @@ Create `AWSIdentityMgmtGeneratorReadOnly` with these AWS managed policies:
 | `AWSSSODirectoryReadOnly` | Read Identity Store (users, groups) |
 | `IAMReadOnlyAccess` | Read IAM managed policies |
 | `AmazonDynamoDBReadOnlyAccess` | *(Optional)* Only if using TEAM |
+| `AWSOrganizationsReadOnlyAccess` | *(Optional)* Only if using TEAM |
 
 Plus an inline policy for Identity Store lookups (not covered by managed policies):
 ```json

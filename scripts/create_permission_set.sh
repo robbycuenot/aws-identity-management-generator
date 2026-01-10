@@ -78,6 +78,12 @@ aws sso-admin attach-managed-policy-to-permission-set \
   --permission-set-arn "$PERMISSION_SET_ARN" \
   --managed-policy-arn "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess" 2>/dev/null || true
 
+# Optional: Organizations read access for TEAM support
+aws sso-admin attach-managed-policy-to-permission-set \
+  --instance-arn "$INSTANCE_ARN" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --managed-policy-arn "arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess" 2>/dev/null || true
+
 # Add inline policy for identitystore actions not covered by AWSSSODirectoryReadOnly
 echo "Adding inline policy for Identity Store read access..."
 INLINE_POLICY='{
