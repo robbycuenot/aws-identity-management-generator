@@ -22,20 +22,15 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Pre-create venv directory and install Python dependencies
-# The workspace will be mounted at /workspaces/aws-identity-management-generator
+# Use /home/vscode/venv so it persists after workspace mount overwrites /workspaces
 COPY scripts/requirements.txt /tmp/requirements.txt
-COPY scripts/activate_env.sh /tmp/activate_env.sh
-RUN mkdir -p /workspaces/aws-identity-management-generator/scripts && \
-    mv /tmp/requirements.txt /workspaces/aws-identity-management-generator/scripts/ && \
-    mv /tmp/activate_env.sh /workspaces/aws-identity-management-generator/scripts/ && \
-    chown -R vscode:vscode /workspaces
 
 USER vscode
-WORKDIR /workspaces/aws-identity-management-generator
-RUN bash scripts/activate_env.sh
+RUN python3 -m venv /home/vscode/venv && \
+    /home/vscode/venv/bin/pip install --upgrade pip && \
+    /home/vscode/venv/bin/pip install -r /tmp/requirements.txt
 
 USER root
-WORKDIR /
 
 # Customize shell environment
 RUN echo "complete -C aws_completer aws" >> /home/vscode/.bashrc && \

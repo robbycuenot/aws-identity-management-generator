@@ -9,7 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Constants
-VENV_DIR="$REPO_ROOT/venv"
+# Use /home/vscode/venv in Codespaces (prebuild creates it there), otherwise use repo-local venv
+if [ -d "/home/vscode/venv" ]; then
+    VENV_DIR="/home/vscode/venv"
+else
+    VENV_DIR="$REPO_ROOT/venv"
+fi
 REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
 # Set AWS region if not already set (e.g., by GitHub Actions)
