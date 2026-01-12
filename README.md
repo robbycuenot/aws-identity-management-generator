@@ -6,7 +6,7 @@ Automated Terraform code generation for AWS IAM Identity Center.
 
 This tool reverse-generates the current AWS IAM Identity Center state into structured Terraform HCL, addressing challenges that come with maintaining a system modified by multiple sources (SCIM, AWS console, Account Factory, break-glass scenarios, etc.).
 
-## Quick Start
+## Quick Start - Codespaces
 
 Get running in 5 minutes with Codespaces - no local setup required.
 
@@ -33,7 +33,14 @@ curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-g
 python3 scripts/iam_identity_center_generator.py -v normal -o output
 ```
 
-Your Terraform code is now in `output/`. Run `terraform init && terraform apply` to manage Identity Center as code.
+**5. Plan the Terraform:**
+```bash
+cd output
+terraform init
+terraform plan
+```
+
+This should show all resources being imported with no changes -- if so, your Terraform now matches your Identity Center.
 
 **For ongoing automation**, see [GitHub Actions](#github-actions) to set up automatic PR generation on a schedule.
 
@@ -41,16 +48,25 @@ Your Terraform code is now in `output/`. Run `terraform init && terraform apply`
 
 ## How It Works
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  AWS Identity   │────▶│    Generator    │────▶│   Terraform     │
-│     Center      │     │  (this repo)    │     │   Code (.tf)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                                                        ▼
-                                                ┌─────────────────┐
-                                                │ terraform apply │
-                                                └─────────────────┘
+```mermaid
+flowchart TB
+    subgraph AWS["AWS"]
+        IDC["IAM Identity Center"]
+    end
+    
+    subgraph GitHub["GitHub"]
+        GEN["aws-identity-management-generator"]
+        MGT["aws-identity-management"]
+    end
+    
+    subgraph TFC["Terraform Cloud"]
+        APPLY["terraform apply"]
+    end
+    
+    GEN <-->|"reads"| IDC
+    GEN -->|"generates code"| MGT
+    MGT -->|"deploys via"| TFC
+    TFC -->|"manages"| IDC
 ```
 
 The generator reads your current AWS state and produces Terraform configurations. You then apply those configurations to manage Identity Center as code.
@@ -63,28 +79,10 @@ Choose how to run the generator based on your needs:
 
 | Method | Best For | Setup Effort |
 |--------|----------|--------------|
-| [Codespaces](#codespaces) | Quick start, no local setup | Lowest |
+| [Codespaces](#quick-start---codespaces) | Quick start, no local setup | Lowest |
 | [GitHub Actions](#github-actions) | Automation, teams, PRs | Low |
 | [Local Python](#local-python) | Development, debugging | Medium |
 | [Container](#container) | CI/CD, air-gapped environments | Low |
-
-### Codespaces
-
-Zero local setup - runs entirely in the browser. Great for quick testing or when you can't install dependencies locally.
-
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/robbycuenot/aws-identity-management-generator)
-
-1. Click the badge above or go to Code → Codespaces → Create codespace
-2. Wait for the environment to build (includes Python, AWS CLI, Terraform)
-3. Get AWS credentials (see [Prerequisites](#permission-set-for-local-development) to create the permission set, then copy credentials from your access portal)
-4. Run the generator:
-
-```bash
-cd scripts
-python3 iam_identity_center_generator.py -v normal -o ../output
-```
-
-The devcontainer is pre-configured with all dependencies.
 
 ### GitHub Actions
 
