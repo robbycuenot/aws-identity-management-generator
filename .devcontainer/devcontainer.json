@@ -1,5 +1,8 @@
 {
-    "dockerFile": "Dockerfile",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
     "postAttachCommand": "source scripts/activate_env.sh",
     "features": {
       "ghcr.io/devcontainers/features/docker-outside-of-docker:latest": {
