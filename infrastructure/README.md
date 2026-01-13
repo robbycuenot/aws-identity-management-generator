@@ -38,7 +38,13 @@ Terraform module that deploys the infrastructure required to run the AWS IAM Ide
    - Environments: Read and write
    - Secrets: Read and write
 
-3. Get your GitHub App Installation ID for TFC VCS integration, OR your OAuth Token ID if using OAuth connection
+3. Create a TFC workspace for deploying this infrastructure module, then run this script in AWS CloudShell on your Identity Center account to create the deployment role:
+   ```bash
+   curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-generator/main/scripts/create_infrastructure_role.sh | bash
+   ```
+   The script will prompt for your TFC organization, project, and workspace names, then output the environment variables to set on your workspace.
+
+4. Get your GitHub App Installation ID for TFC VCS integration, OR your OAuth Token ID if using OAuth connection
 
 ## Usage
 
@@ -49,7 +55,7 @@ module "identity_management" {
   # Required
   environment            = "production"
   github_owner           = "your-github-org"
-  github_installation_id = "12345678"
+  github_installation_id = "12345678"  # OR use github_oauth_token_id
   github_token           = var.github_token
   tfc_organization_name  = "your-tfc-org"
 
@@ -59,8 +65,10 @@ module "identity_management" {
   aws_region                      = "us-east-1"
   enable_team                     = false
   create_tfc_project              = true
-  create_aws_tfc_oidc_provider    = true
-  create_aws_github_oidc_provider = true
+  
+  # Set to false if OIDC providers were created by the setup script
+  create_aws_tfc_oidc_provider    = false
+  create_aws_github_oidc_provider = false
 }
 ```
 
@@ -97,15 +105,15 @@ module "identity_management" {
 
 ## Workspace Variables
 
-When deploying this module via TFC, set these on the workspace:
+When deploying this module via TFC, set these environment variables on the workspace (output by the setup script):
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `TFE_TOKEN` | env (sensitive) | TFC token for managing resources |
 | `TFC_AWS_PROVIDER_AUTH` | env | Set to `true` |
-| `TFC_AWS_RUN_ROLE_ARN` | env | IAM role ARN for OIDC |
+| `TFC_AWS_RUN_ROLE_ARN` | env | IAM role ARN for OIDC (from setup script) |
+| `TFE_TOKEN` | env (sensitive) | TFC token for managing TFC resources |
 
-Plus the terraform variables listed above.
+Plus the terraform variables listed above (as Terraform variables, not environment variables).
 
 ## Outputs
 
