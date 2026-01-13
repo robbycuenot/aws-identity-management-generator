@@ -81,8 +81,15 @@ variable "github_generator_repo" {
 }
 
 variable "github_installation_id" {
-  description = "GitHub App installation ID for VCS connection"
+  description = "GitHub App installation ID for VCS connection (use this OR github_oauth_token_id)"
   type        = string
+  default     = null
+}
+
+variable "github_oauth_token_id" {
+  description = "GitHub OAuth token ID for VCS connection (use this OR github_installation_id)"
+  type        = string
+  default     = null
 }
 
 variable "github_token" {

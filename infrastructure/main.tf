@@ -34,6 +34,7 @@ module "tfc_multi_state" {
   github_repo            = var.github_repo
   github_generator_repo  = var.github_generator_repo
   github_installation_id = var.github_installation_id
+  github_oauth_token_id  = var.github_oauth_token_id
   github_token           = var.github_token
 
   # TFC configuration
@@ -72,6 +73,7 @@ module "tfc_single_state" {
   github_repo            = var.github_repo
   github_generator_repo  = var.github_generator_repo
   github_installation_id = var.github_installation_id
+  github_oauth_token_id  = var.github_oauth_token_id
   github_token           = var.github_token
 
   # TFC configuration

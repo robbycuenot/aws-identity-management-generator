@@ -60,6 +60,7 @@ resource "tfe_workspace" "identity_management" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 

@@ -68,6 +68,7 @@ resource "tfe_workspace" "identity_store" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 
@@ -104,6 +105,7 @@ resource "tfe_workspace" "managed_policies" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 
@@ -141,6 +143,7 @@ resource "tfe_workspace" "permission_sets" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 
@@ -177,6 +180,7 @@ resource "tfe_workspace" "account_assignments" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 
@@ -213,6 +217,7 @@ resource "tfe_workspace" "team" {
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"
     github_app_installation_id = var.github_installation_id
+    oauth_token_id             = var.github_oauth_token_id
     branch                     = "main"
   }
 

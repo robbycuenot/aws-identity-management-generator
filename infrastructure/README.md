@@ -38,7 +38,7 @@ Terraform module that deploys the infrastructure required to run the AWS IAM Ide
    - Environments: Read and write
    - Secrets: Read and write
 
-3. Get your GitHub App Installation ID for TFC VCS integration
+3. Get your GitHub App Installation ID for TFC VCS integration, OR your OAuth Token ID if using OAuth connection
 
 ## Usage
 
@@ -72,7 +72,8 @@ module "identity_management" {
 |----------|-------------|
 | `environment` | Environment name (used in naming and GitHub environment) |
 | `github_owner` | GitHub organization or user |
-| `github_installation_id` | GitHub App installation ID for VCS |
+| `github_installation_id` | GitHub App installation ID for VCS (use this OR `github_oauth_token_id`) |
+| `github_oauth_token_id` | GitHub OAuth token ID for VCS (use this OR `github_installation_id`) |
 | `github_token` | GitHub PAT (sensitive) |
 | `tfc_organization_name` | TFC organization name (must exist) |
 
