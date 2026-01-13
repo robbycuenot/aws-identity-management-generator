@@ -34,6 +34,7 @@ Terraform module that deploys the infrastructure required to run the AWS IAM Ide
    - Actions: Read and write
    - Actions variables: Read and write
    - Administration: Read and write (for deploy keys on generator repo)
+   - Codespaces secrets: Read and write
    - Environments: Read and write
    - Secrets: Read and write
 
