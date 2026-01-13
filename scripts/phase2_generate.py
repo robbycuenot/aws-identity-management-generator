@@ -1513,25 +1513,24 @@ def generate_terraform(verbosity=0, output=".", config="config.yaml", overrides=
         overrides: Dictionary of CLI parameter overrides
         retain_managed_policies: Preserve managed policies from existing output
     """
-    # Merge overrides to get final state_mode and platform
+    # Load config first to get values, then apply CLI overrides
     merged_overrides = overrides or {}
+    cfg = reload_config(config, merged_overrides)
     
-    # Create the context - it will load config and apply overrides
+    # Get final values (CLI overrides > config.yaml > defaults)
+    state_mode = cfg.get_state_mode()
+    platform = cfg.get_platform()
+    
+    # Create the context with resolved values
     ctx = GeneratorContext(
         output_dir=output,
         config_path=config,
-        state_mode=merged_overrides.get('state_mode') or 'single',
-        platform=merged_overrides.get('platform') or 'local',
+        state_mode=state_mode,
+        platform=platform,
         verbosity=verbosity,
         retain_managed_policies=retain_managed_policies,
         overrides=merged_overrides
     )
-    
-    # Re-read from config in case overrides were None but config.yaml has values
-    state_mode = ctx.config.get_state_mode()
-    platform = ctx.config.get_platform()
-    ctx.state_mode = state_mode
-    ctx.platform = platform
     
     ctx.log(f"[GENERATE] Starting Terraform generation (state-mode: {state_mode}, platform: {platform})...")
 
