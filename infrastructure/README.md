@@ -145,6 +145,18 @@ After deploying:
 4. The workflow creates a PR with generated code
 5. Merging triggers TFC workspace runs
 
+## Post-Deployment: Codespaces Package Access
+
+If using Codespaces with the generator Docker image, you need to grant your identity management repository access to the container package:
+
+1. Go to your generator repository's Packages page (e.g., `github.com/your-org/aws-identity-management-generator/pkgs/container/aws-identity-management-generator`)
+2. Click "Package settings"
+3. Under "Manage Codespaces access", click "Add Repository"
+4. Select your `aws-identity-management` repository
+5. Set Role to "Read"
+
+This allows Codespaces in the identity management repo to pull the generator Docker image.
+
 ## File Structure
 
 ```
