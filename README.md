@@ -375,7 +375,7 @@ Customize templates in `templates/` or extend `phase1_fetch.py` / `phase2_genera
 
 ## Keeping Up to Date
 
-Both repos include a `sync-from-upstream.yaml` workflow that creates PRs to pull updates from the upstream public repos.
+The generator repo includes a `sync-from-upstream.yaml` workflow that creates PRs to pull updates from the upstream public repo.
 
 ---
 
