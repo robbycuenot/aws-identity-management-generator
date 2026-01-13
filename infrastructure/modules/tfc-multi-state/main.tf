@@ -691,6 +691,25 @@ resource "github_actions_environment_secret" "generator_deploy_key" {
 }
 
 # ============================================================================
+# GitHub Codespaces Secrets
+# ============================================================================
+# These secrets are available to Codespaces for the repository, allowing the
+# iam_identity_center_generator script to use the correct Docker image.
+# ============================================================================
+
+resource "github_codespaces_secret" "generator_repo_name" {
+  repository      = var.github_repo
+  secret_name     = "GENERATOR_REPO_NAME"
+  plaintext_value = var.github_generator_repo
+}
+
+resource "github_codespaces_secret" "generator_repo_owner" {
+  repository      = var.github_repo
+  secret_name     = "GENERATOR_REPO_OWNER"
+  plaintext_value = var.github_owner
+}
+
+# ============================================================================
 # Identity Management Variable Set
 # ============================================================================
 # Creates a project-level variable set for shared Identity Management configuration
