@@ -8,13 +8,6 @@
 # Setup:
 # 1. Update UPSTREAM_REPO to point to the public repository
 # 2. Run this workflow manually when you want to check for updates
-#
-# Note: If PR creation fails with "Resource not accessible by integration",
-# either:
-#   a) Enable "Allow GitHub Actions to create and approve pull requests" in
-#      Settings → Actions → General → Workflow permissions
-#   b) Create a PAT with 'repo' scope and add it as SYNC_PAT secret, then
-#      uncomment the SYNC_PAT line below
 # ============================================================================
 
 name: Sync from Upstream
@@ -33,6 +26,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      workflows: write
 
     steps:
       - name: Checkout repository
@@ -66,7 +60,7 @@ jobs:
       - name: Create sync branch and PR
         if: steps.check.outputs.changes != '0'
         env:
-          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH_NAME="sync-upstream-$(date -u '+%Y-%m-%d')"
           
