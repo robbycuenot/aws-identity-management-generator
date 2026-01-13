@@ -67,14 +67,14 @@ check_python() {
 # Function to create virtual environment
 create_venv() {
     if [ ! -d "$VENV_DIR" ]; then
-        print_message info "Creating virtual environment in ./$VENV_DIR..."
+        print_message info "Creating virtual environment in $VENV_DIR..."
         python3 -m venv "$VENV_DIR" || {
             print_message error "Failed to create virtual environment."
             exit 1
         }
         print_message info "Virtual environment created."
     else
-        print_message info "Virtual environment already exists in ./$VENV_DIR."
+        print_message info "Virtual environment already exists in $VENV_DIR."
     fi
 }
 

@@ -54,6 +54,22 @@ def _run_full(ctx):
     output_dir = cfg.get("output")
     retain_policies = cfg.get("retain_managed_policies")
     
+    # Print resolved configuration in normal/verbose mode
+    if verbosity >= 1:
+        print("[CONFIG] Resolved configuration:")
+        print(f"  config_file: {config_path}")
+        print(f"  verbosity: {cfg.get('verbosity')}")
+        print(f"  output: {output_dir}")
+        print(f"  state_mode: {cfg.get('state_mode')}")
+        print(f"  platform: {cfg.get('platform')}")
+        if cfg.get('platform') == 'tfc':
+            print(f"  tfc_org: {cfg.get('tfc_org')}")
+            print(f"  prefix: {cfg.get('prefix')}")
+            print(f"  environment: {cfg.get('environment')}")
+        print(f"  enable_team: {cfg.get('enable_team')}")
+        print(f"  retain_managed_policies: {retain_policies}")
+        print("")
+    
     fetch_data(
         verbosity=verbosity,
         output=output_dir,
