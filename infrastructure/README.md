@@ -46,31 +46,33 @@ Terraform module that deploys the infrastructure required to run the AWS IAM Ide
 
 4. Get your GitHub App Installation ID for TFC VCS integration, OR your OAuth Token ID if using OAuth connection
 
-## Usage
+5. Create a TFC workspace with VCS integration pointing to your imported generator repository, with working directory set to `infrastructure`
+
+## Configuration
+
+Create a `terraform.tfvars` file in the `infrastructure/` directory of your generator repo (this file is gitignored):
 
 ```hcl
-module "identity_management" {
-  source = "github.com/robbycuenot/aws-identity-management-generator//infrastructure"
+# Required
+environment            = "production"
+github_owner           = "your-github-org"
+github_installation_id = "12345678"  # OR use github_oauth_token_id
+github_token           = "ghp_xxxx"  # Or use TFC variable set
+tfc_organization_name  = "your-tfc-org"
 
-  # Required
-  environment            = "production"
-  github_owner           = "your-github-org"
-  github_installation_id = "12345678"  # OR use github_oauth_token_id
-  github_token           = var.github_token
-  tfc_organization_name  = "your-tfc-org"
+# Optional
+deployment_mode                 = "tfc-single-state"
+prefix                          = "aws-identity-management"
+aws_region                      = "us-east-1"
+enable_team                     = false
+create_tfc_project              = true
 
-  # Optional
-  deployment_mode                 = "tfc-single-state"
-  prefix                          = "aws-identity-management"
-  aws_region                      = "us-east-1"
-  enable_team                     = false
-  create_tfc_project              = true
-  
-  # Set to false if OIDC providers were created by the setup script
-  create_aws_tfc_oidc_provider    = false
-  create_aws_github_oidc_provider = false
-}
+# Set to false if OIDC providers were created by the setup script
+create_aws_tfc_oidc_provider    = false
+create_aws_github_oidc_provider = false
 ```
+
+Alternatively, set these as Terraform variables directly in your TFC workspace.
 
 ## Variables
 
