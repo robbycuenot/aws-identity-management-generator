@@ -213,6 +213,7 @@ For team environments with remote state and automated applies.
 
 **Option 1: Infrastructure Module** (recommended)
 - Automates TFC workspace, OIDC, and GitHub environment setup
+- Supports both GitHub App and OAuth VCS connections
 - See [infrastructure module documentation](infrastructure/README.md)
 
 **Option 2: Manual Configuration**
