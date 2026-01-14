@@ -10,25 +10,27 @@ This tool reverse-generates the current AWS IAM Identity Center state into struc
 
 Get running in 5 minutes with Codespaces - no local setup required.
 
-**1. Launch Codespaces:**
-
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/robbycuenot/aws-identity-management-generator)
-
-   - Click the badge above, or go to [the repo](https://github.com/robbycuenot/aws-identity-management-generator) → Code → Codespaces → Create codespace
-   - Wait for the environment to build (~2 minutes)
-
-**2. Create the read-only permission set** (run in AWS CloudShell on your Identity Center account):
+**1. Create the read-only permission set** (run in AWS CloudShell on your Identity Center account):
 ```bash
 curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-generator/main/scripts/create_permission_set.sh | bash
 ```
 
-**3. Get AWS credentials:**
+**2. Get AWS credentials:**
    - Go to your AWS access portal
    - Select the Identity Center account → `AWSIdentityMgmtGeneratorReadOnly`
-   - Copy the environment variables and paste into the Codespaces terminal
+   - Copy the environment variables (you'll paste them into Codespaces)
+   - Note your Identity Center region if it's not `us-east-1`
+
+**3. Launch Codespaces:**
+
+   - Go to this repo → Code → Codespaces → Create codespace
+   - Wait for the Codespace to launch and Python environment to activate
+
+**4. Set credentials in Codespaces:**
+   - Paste the AWS environment variables into the terminal
    - If your Identity Center region is not `us-east-1`, run: `export AWS_REGION=<your-region>`
 
-**4. Run the generator:**
+**5. Run the generator:**
 ```bash
 python3 scripts/iam_identity_center_generator.py -v normal -o output
 ```
