@@ -717,22 +717,42 @@ resource "github_codespaces_secret" "generator_repo_owner" {
 # ============================================================================
 # Identity Management Variable Set
 # ============================================================================
-# Creates a project-level variable set for shared Identity Management configuration
+# Creates a variable set for shared Identity Management configuration
 # This variable set contains OIDC credentials and is applied to all workspaces
-# in the aws-identity-management project
 # Requirements: 12.2, 12.3, 12.4
 # ============================================================================
 
 # Create Identity Management Variable Set
 resource "tfe_variable_set" "identity_management" {
-  name         = "Identity Management"
+  name         = "AWS Identity Management ${var.environment}"
   description  = "Shared OIDC configuration for AWS Identity Management workspaces"
   organization = local.organization_name
 }
 
-# Attach variable set to the project (applies to all workspaces in project)
-resource "tfe_project_variable_set" "identity_management" {
-  project_id      = local.project_id
+# Attach variable set to each workspace
+resource "tfe_workspace_variable_set" "identity_store" {
+  workspace_id    = tfe_workspace.identity_store.id
+  variable_set_id = tfe_variable_set.identity_management.id
+}
+
+resource "tfe_workspace_variable_set" "managed_policies" {
+  workspace_id    = tfe_workspace.managed_policies.id
+  variable_set_id = tfe_variable_set.identity_management.id
+}
+
+resource "tfe_workspace_variable_set" "permission_sets" {
+  workspace_id    = tfe_workspace.permission_sets.id
+  variable_set_id = tfe_variable_set.identity_management.id
+}
+
+resource "tfe_workspace_variable_set" "account_assignments" {
+  workspace_id    = tfe_workspace.account_assignments.id
+  variable_set_id = tfe_variable_set.identity_management.id
+}
+
+resource "tfe_workspace_variable_set" "team" {
+  count           = var.enable_team ? 1 : 0
+  workspace_id    = tfe_workspace.team[0].id
   variable_set_id = tfe_variable_set.identity_management.id
 }
 

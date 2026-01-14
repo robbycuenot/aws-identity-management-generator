@@ -433,13 +433,13 @@ resource "github_codespaces_secret" "generator_repo_owner" {
 # ============================================================================
 
 resource "tfe_variable_set" "identity_management" {
-  name         = "Identity Management"
-  description  = "Shared OIDC configuration for AWS Identity Management workspace"
+  name         = "AWS Identity Management ${var.environment}"
+  description  = "Shared OIDC configuration for AWS Identity Management workspaces"
   organization = local.organization_name
 }
 
-resource "tfe_project_variable_set" "identity_management" {
-  project_id      = local.project_id
+resource "tfe_workspace_variable_set" "identity_management" {
+  workspace_id    = tfe_workspace.identity_management.id
   variable_set_id = tfe_variable_set.identity_management.id
 }
 
