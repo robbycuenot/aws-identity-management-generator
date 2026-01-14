@@ -138,7 +138,8 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "iam:ListRolePolicies",
                 "iam:AttachRolePolicy",
                 "iam:DetachRolePolicy",
-                "iam:ListAttachedRolePolicies"
+                "iam:ListAttachedRolePolicies",
+                "iam:ListInstanceProfilesForRole"
             ],
             "Resource": [
                 "arn:aws:iam::${ACCOUNT_ID}:role/tfc-*",
