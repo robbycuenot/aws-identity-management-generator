@@ -21,6 +21,8 @@ env:
 
 jobs:
   sync:
+    # Only run on imported repos, not on upstream
+    if: github.repository_owner != 'robbycuenot'
     runs-on: ubuntu-latest
     outputs:
       branch_name: ${{ steps.sync.outputs.branch_name }}

@@ -1,0 +1,89 @@
+# ============================================================================
+# Sync Tags from Upstream
+# ============================================================================
+# This workflow runs after a sync PR is merged and creates the latest upstream
+# tag on the merge commit. This triggers the container build workflow.
+#
+# Only runs on imported/forked repositories, not on the upstream source.
+# ============================================================================
+
+name: Sync Tags from Upstream
+
+on:
+  push:
+    branches: [main]
+
+env:
+  UPSTREAM_REPO: robbycuenot/aws-identity-management-generator
+
+jobs:
+  sync-tags:
+    # Only run on imported repos, not on upstream
+    if: github.repository_owner != 'robbycuenot'
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git || true
+          git fetch upstream --tags
+
+      - name: Find new tags to sync
+        id: tags
+        run: |
+          # Get all semver tags from upstream
+          UPSTREAM_TAGS=$(git tag -l 'v*' --sort=-v:refname | head -50)
+          
+          # Get tags that exist in origin
+          ORIGIN_TAGS=$(git ls-remote --tags origin | grep -oP 'refs/tags/\Kv[0-9]+\.[0-9]+\.[0-9]+$' || true)
+          
+          # Find the highest upstream tag not in origin
+          LATEST_NEW_TAG=""
+          for tag in $UPSTREAM_TAGS; do
+            if ! echo "$ORIGIN_TAGS" | grep -q "^${tag}$"; then
+              LATEST_NEW_TAG="$tag"
+              break
+            fi
+          done
+          
+          if [ -z "$LATEST_NEW_TAG" ]; then
+            echo "✅ All upstream tags already exist in this repository" >> $GITHUB_STEP_SUMMARY
+            echo "has_new_tag=false" >> $GITHUB_OUTPUT
+          else
+            echo "📦 New tag to create: $LATEST_NEW_TAG" >> $GITHUB_STEP_SUMMARY
+            echo "has_new_tag=true" >> $GITHUB_OUTPUT
+            echo "tag=$LATEST_NEW_TAG" >> $GITHUB_OUTPUT
+            
+            # Find all tags between current and latest for documentation
+            CURRENT_HIGHEST=$(echo "$ORIGIN_TAGS" | sort -V | tail -1)
+            if [ -n "$CURRENT_HIGHEST" ]; then
+              echo "Previous highest tag: $CURRENT_HIGHEST"
+              echo "previous_tag=$CURRENT_HIGHEST" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create and push tag
+        if: steps.tags.outputs.has_new_tag == 'true'
+        run: |
+          TAG="${{ steps.tags.outputs.tag }}"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create annotated tag on current HEAD
+          git tag -a "$TAG" -m "Synced from upstream ${{ env.UPSTREAM_REPO }}"
+          
+          # Push the tag
+          git push origin "$TAG"
+          
+          echo "✅ Created and pushed tag: $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This tag will trigger the container build workflow." >> $GITHUB_STEP_SUMMARY
