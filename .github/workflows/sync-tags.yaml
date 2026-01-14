@@ -10,7 +10,8 @@
 name: Sync Tags from Upstream
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
 
 env:
@@ -18,8 +19,8 @@ env:
 
 jobs:
   sync-tags:
-    # Only run on imported repos, not on upstream
-    if: github.repository_owner != 'robbycuenot'
+    # Only run on imported repos when PR is merged (not just closed)
+    if: github.repository_owner != 'robbycuenot' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     
     permissions:
