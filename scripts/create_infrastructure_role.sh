@@ -111,14 +111,12 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "iam:CreateOpenIDConnectProvider",
                 "iam:DeleteOpenIDConnectProvider",
                 "iam:GetOpenIDConnectProvider",
+                "iam:ListOpenIDConnectProviders",
                 "iam:TagOpenIDConnectProvider",
                 "iam:UntagOpenIDConnectProvider",
                 "iam:UpdateOpenIDConnectProviderThumbprint"
             ],
-            "Resource": [
-                "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/app.terraform.io",
-                "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
-            ]
+            "Resource": "*"
         },
         {
             "Sid": "IAMRoleManagement",
