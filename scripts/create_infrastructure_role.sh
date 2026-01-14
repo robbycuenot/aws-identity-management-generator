@@ -23,13 +23,15 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}=== Infrastructure Module Deployment Role Setup ===${NC}"
 echo ""
 
-# Prompt for TFC details
-read -p "Terraform Cloud Organization Name: " TFC_ORG
-read -p "Terraform Cloud Project Name: " TFC_PROJECT
-read -p "Terraform Cloud Workspace Name: " TFC_WORKSPACE
-
+# Use environment variables (set before piping script)
 if [ -z "$TFC_ORG" ] || [ -z "$TFC_PROJECT" ] || [ -z "$TFC_WORKSPACE" ]; then
-    echo -e "${RED}Error: All fields are required${NC}"
+    echo -e "${RED}Error: TFC_ORG, TFC_PROJECT, and TFC_WORKSPACE environment variables are required${NC}"
+    echo ""
+    echo "Run this first:"
+    echo '  read -p "TFC Organization: " TFC_ORG && \'
+    echo '  read -p "TFC Project: " TFC_PROJECT && \'
+    echo '  read -p "TFC Workspace: " TFC_WORKSPACE && \'
+    echo '  export TFC_ORG TFC_PROJECT TFC_WORKSPACE'
     exit 1
 fi
 

@@ -143,11 +143,11 @@ variable "create_tfc_project" {
 variable "create_aws_tfc_oidc_provider" {
   description = "Create OIDC provider for Terraform Cloud"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "create_aws_github_oidc_provider" {
   description = "Create OIDC provider for GitHub Actions"
   type        = bool
-  default     = true
+  default     = false
 }
