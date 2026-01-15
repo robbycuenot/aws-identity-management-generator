@@ -16,7 +16,7 @@ on:
       tag:
         description: 'Image tag (e.g., v1.0.0, latest)'
         required: false
-        default: 'dev'
+        default: 'latest'
         type: string
 
 env:
