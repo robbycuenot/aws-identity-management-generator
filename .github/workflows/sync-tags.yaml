@@ -2,7 +2,7 @@
 # Sync Tags from Upstream
 # ============================================================================
 # This workflow runs after a sync PR is merged and creates the latest upstream
-# tag on the merge commit. This triggers the container build workflow.
+# tag on the merge commit, then triggers the container build workflow.
 #
 # Only runs on imported/forked repositories, not on the upstream source.
 # ============================================================================
@@ -22,6 +22,9 @@ jobs:
     # Only run on imported repos when PR is merged (not just closed)
     if: github.repository_owner != 'robbycuenot' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    outputs:
+      has_new_tag: ${{ steps.tags.outputs.has_new_tag }}
+      tag: ${{ steps.tags.outputs.tag }}
     
     permissions:
       contents: write
@@ -81,5 +84,26 @@ jobs:
           git push origin "$TAG"
           
           echo "✅ Created and pushed tag: $TAG" >> $GITHUB_STEP_SUMMARY
+
+  build-container:
+    needs: sync-tags
+    if: needs.sync-tags.outputs.has_new_tag == 'true'
+    runs-on: ubuntu-latest
+    
+    permissions:
+      actions: write
+
+    steps:
+      - name: Trigger container build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.sync-tags.outputs.tag }}"
+          
+          gh workflow run build-container.yaml \
+            --repo "${{ github.repository }}" \
+            -f tag="$TAG"
+          
+          echo "🐳 Triggered container build for tag: $TAG" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "This tag will trigger the container build workflow." >> $GITHUB_STEP_SUMMARY
+          echo "View the build: https://github.com/${{ github.repository }}/actions/workflows/build-container.yaml" >> $GITHUB_STEP_SUMMARY
