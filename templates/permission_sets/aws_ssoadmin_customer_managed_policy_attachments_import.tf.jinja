@@ -1,0 +1,9 @@
+{% for ps_name, policy_list in attachments.items() %}
+{% for policy in policy_list %}
+import {
+  to = {{ module_prefix }}aws_ssoadmin_customer_managed_policy_attachment.controller["{{ ps_name }}___{{ policy.Name }}"]
+  id = "{{ policy.Name }},{{ policy.Path }},{{ policy.PermissionSetArn }},{{ policy.InstanceArn }}"
+}
+
+{% endfor %}
+{% endfor %}

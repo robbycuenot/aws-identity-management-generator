@@ -238,8 +238,12 @@ def copy_templates(source_dir: Path, target_dir: Path, ctx: GeneratorContext):
         'aws_ssoadmin_permission_sets_map.tf.jinja',
         'aws_ssoadmin_permission_sets_import.tf.jinja',
         'aws_ssoadmin_permission_set_inline_policies_import.tf.jinja',
+        'aws_ssoadmin_permission_boundary_attachments_import.tf.jinja',
+        'aws_ssoadmin_permission_boundary_attachments_map.tf.jinja',
         'aws_ssoadmin_managed_policy_attachments_map.tf.jinja',
         'aws_ssoadmin_managed_policy_attachments_import.tf.jinja',
+        'aws_ssoadmin_customer_managed_policy_attachments_map.tf.jinja',
+        'aws_ssoadmin_customer_managed_policy_attachments_import.tf.jinja',
         'aws_ssoadmin_account_assignments_import.tf.jinja',
         'aws_ssoadmin_account_assignments_map.tf.jinja',
         'data.tf.jinja',
@@ -460,7 +464,7 @@ def load_managed_policy_attachments(directory: Path, required_fields: list, ctx:
 
         ps_name = data["ResourceName"]
         import_id = data["ImportId"]
-        instance_arn, permission_set_arn = import_id.split(",", maxsplit=1)
+        permission_set_arn, instance_arn = import_id.split(",", maxsplit=1)
 
         managed_policies = data.get("ManagedPolicies", [])
 
@@ -476,6 +480,80 @@ def load_managed_policy_attachments(directory: Path, required_fields: list, ctx:
         if final_policies:
             attachments[ps_name] = final_policies
             ctx.log(f"[VERBOSE-2] Loaded permission set '{ps_name}' -> {len(final_policies)} policies", 2)
+
+    return attachments
+
+
+def load_permission_boundaries(directory: Path, required_fields: list, ctx: GeneratorContext) -> dict:
+    """
+    Loads each permission_set JSON in 'directory' and returns a dict mapping:
+       PermissionSetName -> { managed_policy_name: "..." } or { customer_managed_policy_name: "...", customer_managed_policy_path: "..." }
+    Only includes permission sets that have a permission boundary attached.
+    """
+    if not directory.is_dir():
+        raise FileNotFoundError(f"[ERROR] Directory not found: {directory}")
+
+    boundaries = {}
+    for json_file in sorted(directory.glob("*.json"), key=lambda f: f.name.lower()):
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not data.get("HasPermissionsBoundary", False):
+            continue
+
+        ps_name = data["ResourceName"]
+        boundary = data.get("PermissionsBoundary", {})
+
+        if boundary:
+            boundaries[ps_name] = boundary
+            ctx.log(f"[VERBOSE-2] Loaded permission boundary for '{ps_name}'", 2)
+
+    return boundaries
+
+
+def load_customer_managed_policy_attachments(directory: Path, required_fields: list, ctx: GeneratorContext) -> dict:
+    """
+    Loads each permission_set JSON in 'directory' and returns a dict mapping:
+       PermissionSetName -> [ { Name: "...", Path: "..." }, ... ]
+    Only includes permission sets that have at least one customer managed policy attached.
+    """
+    if not directory.is_dir():
+        raise FileNotFoundError(f"[ERROR] Directory not found: {directory}")
+
+    attachments = {}
+    for json_file in sorted(directory.glob("*.json"), key=lambda f: f.name.lower()):
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        ps_name = data["ResourceName"]
+        import_id = data["ImportId"]
+        permission_set_arn, instance_arn = import_id.split(",", maxsplit=1)
+
+        customer_managed_policies = data.get("CustomerManagedPolicies", [])
+
+        # Handle both old format (list of strings) and new format (list of dicts)
+        final_policies = []
+        for cmp in customer_managed_policies:
+            if isinstance(cmp, str):
+                # Old format: just the name
+                final_policies.append({
+                    "Name": cmp,
+                    "Path": "/",
+                    "PermissionSetArn": permission_set_arn,
+                    "InstanceArn": instance_arn,
+                })
+            else:
+                # New format: dict with Name and Path
+                final_policies.append({
+                    "Name": cmp.get("Name"),
+                    "Path": cmp.get("Path", "/"),
+                    "PermissionSetArn": permission_set_arn,
+                    "InstanceArn": instance_arn,
+                })
+
+        if final_policies:
+            attachments[ps_name] = final_policies
+            ctx.log(f"[VERBOSE-2] Loaded permission set '{ps_name}' -> {len(final_policies)} customer managed policies", 2)
 
     return attachments
 
@@ -881,6 +959,26 @@ TERRAFORM_GENERATION_TASKS = [
         "output_folder": "permission_sets",
     },
     {
+        "template_name": "aws_ssoadmin_permission_boundary_attachments_import.tf.jinja",
+        "output_name": "aws_ssoadmin_permission_boundary_attachments_import.tf",
+        "json_dir": "permission_sets",
+        "required_fields": ["ResourceName", "ImportId", "HasPermissionsBoundary"],
+        "loader": "load_json_files",
+        "filter": lambda items: [p for p in items if p.get("HasPermissionsBoundary", False)],
+        "data_key": "permission_sets",
+        "output_folder": "permission_sets",
+    },
+    {
+        "template_name": "aws_ssoadmin_permission_boundary_attachments_map.tf.jinja",
+        "output_name": "aws_ssoadmin_permission_boundary_attachments_map.tf",
+        "json_dir": "permission_sets",
+        "required_fields": [],
+        "loader": "load_permission_boundaries",
+        "filter": lambda items: items,
+        "data_key": "boundaries",
+        "output_folder": "permission_sets",
+    },
+    {
         "template_name": "aws_ssoadmin_managed_policy_attachments_map.tf.jinja",
         "output_name": "aws_ssoadmin_managed_policy_attachments_map.tf",
         "json_dir": "permission_sets",
@@ -896,6 +994,26 @@ TERRAFORM_GENERATION_TASKS = [
         "json_dir": "permission_sets",
         "required_fields": ["ResourceName", "ImportId", "ManagedPolicies"],
         "loader": "load_managed_policy_attachments",
+        "filter": lambda items: items,
+        "data_key": "attachments",
+        "output_folder": "permission_sets",
+    },
+    {
+        "template_name": "aws_ssoadmin_customer_managed_policy_attachments_map.tf.jinja",
+        "output_name": "aws_ssoadmin_customer_managed_policy_attachments_map.tf",
+        "json_dir": "permission_sets",
+        "required_fields": [],
+        "loader": "load_customer_managed_policy_attachments",
+        "filter": lambda items: items,
+        "data_key": "attachments",
+        "output_folder": "permission_sets",
+    },
+    {
+        "template_name": "aws_ssoadmin_customer_managed_policy_attachments_import.tf.jinja",
+        "output_name": "aws_ssoadmin_customer_managed_policy_attachments_import.tf",
+        "json_dir": "permission_sets",
+        "required_fields": [],
+        "loader": "load_customer_managed_policy_attachments",
         "filter": lambda items: items,
         "data_key": "attachments",
         "output_folder": "permission_sets",
@@ -1192,6 +1310,10 @@ def generate_terraform_files(ctx: GeneratorContext):
             raw_data = load_json_files(directory, task["required_fields"], ctx, allow_missing=allow_missing)
         elif loader_name == "load_managed_policy_attachments":
             raw_data = load_managed_policy_attachments(directory, task["required_fields"], ctx)
+        elif loader_name == "load_permission_boundaries":
+            raw_data = load_permission_boundaries(directory, task["required_fields"], ctx)
+        elif loader_name == "load_customer_managed_policy_attachments":
+            raw_data = load_customer_managed_policy_attachments(directory, task["required_fields"], ctx)
         elif loader_name == "load_account_assignments":
             raw_data = load_account_assignments(directory, task["required_fields"], ctx)
         else:

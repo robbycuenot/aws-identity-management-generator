@@ -1,0 +1,14 @@
+locals {
+  permission_set_permission_boundaries_map = {
+{% for ps_name, boundary in boundaries.items() %}
+    "{{ ps_name }}" = {
+{% if boundary.managed_policy_name %}
+      managed_policy_name = "{{ boundary.managed_policy_name }}"
+{% else %}
+      customer_managed_policy_name = "{{ boundary.customer_managed_policy_name }}"
+      customer_managed_policy_path = "{{ boundary.customer_managed_policy_path }}"
+{% endif %}
+    }
+{% endfor %}
+  }
+}

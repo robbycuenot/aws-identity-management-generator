@@ -1,0 +1,18 @@
+resource "aws_ssoadmin_permissions_boundary_attachment" "controller" {
+  for_each = local.permission_set_permission_boundaries_map
+
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = local.permission_sets_map[each.key]
+
+  permissions_boundary {
+    managed_policy_arn = try(var.managed_policies_map[each.value.managed_policy_name], null)
+
+    dynamic "customer_managed_policy_reference" {
+      for_each = try(each.value.customer_managed_policy_name, null) != null ? [1] : []
+      content {
+        name = each.value.customer_managed_policy_name
+        path = each.value.customer_managed_policy_path
+      }
+    }
+  }
+}

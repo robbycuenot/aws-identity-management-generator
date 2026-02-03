@@ -371,10 +371,11 @@ def fetch_permission_sets(sso_admin, instance_arn, verbosity=0):
     if verbosity >= 1:
         print(f"[FETCH] Done fetching permission sets. Count: {len(permission_sets)}")
 
-    # 5) Fetch inline/managed/customer-managed policies
+    # 5) Fetch inline/managed/customer-managed policies and permissions boundaries
     fetch_inline_policies(sso_admin, instance_arn, permission_sets, verbosity)
     fetch_managed_policy_attachments(sso_admin, instance_arn, permission_sets, verbosity)
     fetch_customer_managed_policy_attachments(sso_admin, instance_arn, permission_sets, verbosity)
+    fetch_permission_boundaries(sso_admin, instance_arn, permission_sets, verbosity)
     fetch_permission_set_tags(sso_admin, instance_arn, permission_sets, verbosity)
 
     return {ps["PermissionSetArn"]: ps["ResourceName"] for ps in permission_sets}
@@ -417,6 +418,62 @@ def fetch_inline_policies(sso_admin, instance_arn, permission_sets, verbosity=0)
         print("[FETCH] Done fetching inline policies.")
 
 
+def fetch_permission_boundaries(sso_admin, instance_arn, permission_sets, verbosity=0):
+    """
+    Fetch permission boundary for each permission set.
+    A permission set can have at most one permission boundary attached.
+    The boundary can be either an AWS managed policy ARN or a customer managed policy reference.
+    """
+    for ps in permission_sets:
+        ps_arn = ps["PermissionSetArn"]
+        ps_name = ps["ResourceName"]
+
+        try:
+            resp = sso_admin.get_permissions_boundary_for_permission_set(
+                InstanceArn=instance_arn,
+                PermissionSetArn=ps_arn
+            )
+            time.sleep(SLEEP_DELAY)
+
+            boundary = resp.get("PermissionsBoundary")
+            if boundary:
+                ps["HasPermissionsBoundary"] = True
+                # Store in normalized format for the map template
+                if "ManagedPolicyArn" in boundary:
+                    # Extract policy name from ARN (arn:aws:iam::aws:policy/PolicyName)
+                    arn = boundary["ManagedPolicyArn"]
+                    policy_name = arn.split("/")[-1]
+                    ps["PermissionsBoundary"] = {
+                        "managed_policy_name": policy_name
+                    }
+                elif "CustomerManagedPolicyReference" in boundary:
+                    ref = boundary["CustomerManagedPolicyReference"]
+                    ps["PermissionsBoundary"] = {
+                        "customer_managed_policy_name": ref["Name"],
+                        "customer_managed_policy_path": ref.get("Path", "/")
+                    }
+
+                if verbosity >= 2:
+                    print(f"[VERBOSE-2] Found permission boundary for: {ps_name}")
+            else:
+                ps["HasPermissionsBoundary"] = False
+
+        except sso_admin.exceptions.ResourceNotFoundException:
+            ps["HasPermissionsBoundary"] = False
+            if verbosity >= 2:
+                print(f"[VERBOSE-2] No permission boundary found for permission set: {ps_name}")
+
+    # Update the JSON files with HasPermissionsBoundary field
+    for ps in permission_sets:
+        ps_name = ps["ResourceName"]
+        filepath = Path(JSON_DIR) / "permission_sets" / f"{ps_name}.json"
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(ps, f, indent=2, ensure_ascii=False, default=str)
+
+    if verbosity >= 1:
+        print("[FETCH] Done fetching permission boundaries.")
+
+
 def fetch_managed_policy_attachments(sso_admin, instance_arn, permission_sets, verbosity=0):
     for ps in permission_sets:
         ps_arn = ps["PermissionSetArn"]
@@ -455,8 +512,15 @@ def fetch_customer_managed_policy_attachments(sso_admin, instance_arn, permissio
         )
         time.sleep(SLEEP_DELAY)
 
-        cust_managed_names = [p["Name"] for p in resp["CustomerManagedPolicyReferences"]]
-        ps["CustomerManagedPolicies"] = cust_managed_names
+        # Store both name and path for each customer managed policy
+        cust_managed_policies = [
+            {
+                "Name": p["Name"],
+                "Path": p.get("Path", "/")
+            }
+            for p in resp["CustomerManagedPolicyReferences"]
+        ]
+        ps["CustomerManagedPolicies"] = cust_managed_policies
 
     # Update JSON files
     for ps in permission_sets:

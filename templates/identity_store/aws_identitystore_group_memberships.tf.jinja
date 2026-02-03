@@ -1,3 +1,14 @@
+locals {
+  group_memberships_flattened = flatten([
+    for group, users in local.group_memberships_map : [
+      for user in users : {
+        "group" = group
+        "user"  = user
+      }
+    ]
+  ])
+}
+
 resource "aws_identitystore_group_membership" "controller" {
   for_each = { for membership in local.group_memberships_flattened : "${membership.group}___${membership.user}" => membership }
 

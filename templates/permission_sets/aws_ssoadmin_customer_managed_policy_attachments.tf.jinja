@@ -1,0 +1,26 @@
+locals {
+  permission_set_customer_managed_policy_attachments_flattened = flatten([
+    for ps_name, policies in local.permission_set_customer_managed_policy_attachments_map : [
+      for policy in policies : {
+        permission_set = ps_name
+        policy_name    = policy.name
+        policy_path    = policy.path
+      }
+    ]
+  ])
+}
+
+resource "aws_ssoadmin_customer_managed_policy_attachment" "controller" {
+  for_each = {
+    for attachment in local.permission_set_customer_managed_policy_attachments_flattened :
+    "${attachment.permission_set}___${attachment.policy_name}" => attachment
+  }
+
+  instance_arn       = local.sso_instance_arn
+  permission_set_arn = local.permission_sets_map[each.value.permission_set]
+
+  customer_managed_policy_reference {
+    name = each.value.policy_name
+    path = each.value.policy_path
+  }
+}

@@ -1,3 +1,20 @@
+locals {
+  account_assignments_flattened = flatten([
+    for account_name, permissions in local.account_assignments_map : [
+      for permission_set, principals in permissions : [
+        for principal_type, principal_list in principals : [
+          for principal in principal_list : {
+            principal_type  = principal_type
+            principal       = principal
+            account_name    = account_name
+            permission_set  = permission_set
+          }
+        ]
+      ]
+    ]
+  ])
+}
+
 resource "aws_ssoadmin_account_assignment" "controller" {
   for_each = { for assignment in local.account_assignments_flattened : "${assignment.account_name}___${assignment.permission_set}___${assignment.principal_type}___${assignment.principal}" => assignment }
 
