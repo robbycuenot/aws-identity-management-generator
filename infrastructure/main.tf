@@ -84,4 +84,77 @@ module "tfc_single_state" {
   create_tfc_project              = var.create_tfc_project
   create_aws_tfc_oidc_provider    = var.create_aws_tfc_oidc_provider
   create_aws_github_oidc_provider = var.create_aws_github_oidc_provider
+
+  # TFC Agent configuration (optional)
+  agent_pool_id = var.enable_tfc_agent_ecs ? module.tfc_agent_ecs[0].agent_pool_id : null
+}
+
+# =============================================================================
+# TFC Agent on ECS Fargate (Optional - Single-State Mode Only)
+# =============================================================================
+
+# Validation checks for TFC Agent configuration
+check "tfc_agent_deployment_mode" {
+  assert {
+    condition     = !var.enable_tfc_agent_ecs || var.deployment_mode == "tfc-single-state"
+    error_message = "enable_tfc_agent_ecs is only supported with deployment_mode = \"tfc-single-state\""
+  }
+}
+
+check "tfc_agent_vpc_required" {
+  assert {
+    condition     = !var.enable_tfc_agent_ecs || var.tfc_agent_vpc_id != null
+    error_message = "tfc_agent_vpc_id is required when enable_tfc_agent_ecs = true"
+  }
+}
+
+check "tfc_agent_subnets_required" {
+  assert {
+    condition     = !var.enable_tfc_agent_ecs || (var.tfc_agent_subnet_ids != null && length(var.tfc_agent_subnet_ids) > 0)
+    error_message = "tfc_agent_subnet_ids is required when enable_tfc_agent_ecs = true"
+  }
+}
+
+module "tfc_agent_ecs" {
+  count  = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
+  source = "./modules/tfc-agent-ecs"
+
+  providers = {
+    aws = aws.identity_center
+    tfe = tfe
+  }
+
+  aws_region       = var.aws_region
+  name_prefix      = "${var.prefix}-${var.environment}-tfc-agent"
+  tfc_organization = var.tfc_organization_name
+  tfc_agent_name   = var.tfc_agent_name
+  tasks_per_run    = var.tfc_agent_tasks_per_run
+
+  # VPC configuration
+  vpc_id     = var.tfc_agent_vpc_id
+  subnet_ids = var.tfc_agent_subnet_ids
+
+  tags = {
+    Environment = var.environment
+    Project     = var.prefix
+  }
+}
+
+# =============================================================================
+# TFC Webhook Notification Configuration
+# =============================================================================
+# Configured separately to avoid circular dependency:
+# tfc_agent_ecs creates agent pool → tfc_single_state uses agent pool → 
+# notification uses workspace_id from tfc_single_state
+
+resource "tfe_notification_configuration" "tfc_agent_webhook" {
+  count = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
+
+  workspace_id     = module.tfc_single_state[0].workspace_id
+  name             = "${var.prefix}-${var.environment}-agent-launcher"
+  enabled          = true
+  destination_type = "generic"
+  triggers         = ["run:created", "run:needs_attention"]
+  url              = module.tfc_agent_ecs[0].webhook_url
+  token            = module.tfc_agent_ecs[0].webhook_secret
 }

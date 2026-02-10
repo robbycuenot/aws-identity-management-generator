@@ -73,7 +73,8 @@ resource "tfe_workspace" "identity_management" {
 
 resource "tfe_workspace_settings" "identity_management" {
   workspace_id   = tfe_workspace.identity_management.id
-  execution_mode = "remote"
+  execution_mode = var.agent_pool_id != null ? "agent" : "remote"
+  agent_pool_id  = var.agent_pool_id
 }
 
 # ============================================================================

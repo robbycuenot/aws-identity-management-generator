@@ -90,6 +90,18 @@ Set these variables in your TFC workspace:
 | `create_aws_tfc_oidc_provider` | terraform | no | Create TFC OIDC provider in AWS | `false` |
 | `create_aws_github_oidc_provider` | terraform | no | Create GitHub OIDC provider in AWS | `false` |
 
+### TFC Agent on ECS Fargate (Optional - Single-State Mode Only)
+
+| Variable | Type | Sensitive | Description | Default |
+|----------|------|-----------|-------------|---------|
+| `enable_tfc_agent_ecs` | terraform | no | Enable TFC agent on ECS Fargate (single-state mode only) | `false` |
+| `tfc_agent_name` | terraform | no | Name for the TFC agent (appears in TFC UI) | `ecs-agent` |
+| `tfc_agent_tasks_per_run` | terraform | no | Number of ECS tasks to start per run (2 = one for plan, one for apply) | `2` |
+| `tfc_agent_vpc_id` | terraform | no | VPC ID (required if `enable_tfc_agent_ecs = true`) | `null` |
+| `tfc_agent_subnet_ids` | terraform | no | Private subnet IDs with NAT (required if `enable_tfc_agent_ecs = true`) | `null` |
+
+Note: `enable_tfc_agent_ecs` is only supported with `deployment_mode = "tfc-single-state"`. Attempting to use it with multi-state mode will fail.
+
 ## Outputs
 
 | Output | Description |
@@ -100,6 +112,102 @@ Set these variables in your TFC workspace:
 | `workspace_names` | List of created workspace names |
 | `iam_role_arns` | Map of IAM role ARNs |
 | `github_environment_name` | GitHub environment name |
+
+### TFC Agent ECS Outputs (when `enable_tfc_agent_ecs = true`)
+
+| Output | Description |
+|--------|-------------|
+| `tfc_agent_pool_id` | ID of the TFC agent pool |
+| `tfc_agent_pool_name` | Name of the TFC agent pool |
+| `tfc_agent_webhook_url` | Webhook URL for TFC notifications |
+| `tfc_agent_ecs_cluster_name` | Name of the ECS cluster |
+| `tfc_agent_vpc_id` | ID of the VPC |
+| `tfc_agent_subnet_ids` | Subnet IDs used by ECS tasks |
+| `tfc_agent_cloudwatch_log_group` | CloudWatch log group for agent logs |
+
+## TFC Agent on ECS Fargate (Single-State Mode Only)
+
+The module can deploy a webhook-triggered Terraform Cloud agent on ECS Fargate. This is only available when using `deployment_mode = "tfc-single-state"`.
+
+- **Single-execution mode**: Tasks start on demand, execute one job, then exit
+- **Pay only for execution time**: No idle costs
+- **16 vCPU, 32 GB RAM, 200 GB storage** (maximum Fargate configuration)
+- **ECR pull-through cache**: Images cached in your account
+- **Webhook-triggered**: TFC notifications start ECS tasks automatically
+- **Automatic workspace configuration**: The workspace is automatically configured to use agent execution mode
+
+### Usage
+
+Provide your VPC ID and private subnet IDs:
+
+```hcl
+enable_tfc_agent_ecs   = true
+tfc_agent_vpc_id       = "vpc-0123456789abcdef0"
+tfc_agent_subnet_ids   = ["subnet-aaa", "subnet-bbb"]
+```
+
+### What Gets Created
+
+**In Terraform Cloud:**
+- Agent pool (organization-scoped)
+- Agent token (stored in AWS Secrets Manager)
+
+**In AWS:**
+- API Gateway HTTP endpoint (webhook receiver)
+- Lambda function (starts ECS tasks on webhook)
+- ECR pull-through cache rule for Docker Hub
+- ECS cluster with Fargate capacity provider
+- ECS task definition (single-execution mode)
+- Security group allowing outbound traffic
+- IAM roles for Lambda, task execution, and ECS Exec
+- CloudWatch log groups for Lambda and ECS tasks
+
+### How It Works
+
+```
+TFC Run Created → Webhook POST → API Gateway → Lambda → ECS RunTask
+                                                            ↓
+                                              Task picks up job, executes, exits
+```
+
+1. When a run is created in the workspace, TFC sends a webhook
+2. API Gateway receives the webhook and invokes Lambda
+3. Lambda verifies the HMAC signature and starts 2 ECS tasks
+4. Tasks connect to TFC, pick up the plan/apply jobs, execute, then exit
+5. You only pay for actual execution time
+
+### ECR Pull-Through Cache
+
+Images are pulled through ECR instead of directly from Docker Hub. This provides:
+- Cached images in your AWS account
+- No Docker Hub rate limits
+- Images stay in your security boundary
+- Automatic caching on first pull
+
+The image path becomes:
+```
+<account_id>.dkr.ecr.<region>.amazonaws.com/docker-hub/hashicorp/tfc-agent:latest
+```
+
+### Viewing Logs
+
+```bash
+# ECS task logs
+aws logs tail /ecs/aws-identity-management-<environment>-tfc-agent --follow
+
+# Webhook Lambda logs
+aws logs tail /aws/lambda/aws-identity-management-<environment>-tfc-agent-webhook --follow
+```
+
+### Debugging with ECS Exec
+
+```bash
+# Get task ARN
+TASK_ARN=$(aws ecs list-tasks --cluster aws-identity-management-<environment>-tfc-agent-cluster --query 'taskArns[0]' --output text)
+
+# Connect to container
+aws ecs execute-command --cluster aws-identity-management-<environment>-tfc-agent-cluster --task $TASK_ARN --container tfc-agent --interactive --command /bin/sh
+```
 
 ## GitHub Actions Variables
 

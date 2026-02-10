@@ -16,6 +16,12 @@ variable "deployment_mode" {
   }
 }
 
+variable "enable_tfc_agent_ecs" {
+  description = "Enable TFC agent on ECS Fargate with webhook-triggered single-execution mode (single-state mode only)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Generator Parameters (maps to CLI flags / config.yaml / GH env vars)
 # =============================================================================
@@ -150,4 +156,32 @@ variable "create_aws_github_oidc_provider" {
   description = "Create OIDC provider for GitHub Actions"
   type        = bool
   default     = false
+}
+
+# =============================================================================
+# TFC Agent on ECS Fargate (Single-State Mode Only)
+# =============================================================================
+
+variable "tfc_agent_name" {
+  description = "Name for the TFC agent (appears in TFC UI)"
+  type        = string
+  default     = "ecs-agent"
+}
+
+variable "tfc_agent_tasks_per_run" {
+  description = "Number of ECS tasks to start per TFC run (2 recommended: one for plan, one for apply)"
+  type        = number
+  default     = 2
+}
+
+variable "tfc_agent_vpc_id" {
+  description = "VPC ID for TFC agent (required if enable_tfc_agent_ecs = true)"
+  type        = string
+  default     = null
+}
+
+variable "tfc_agent_subnet_ids" {
+  description = "Subnet IDs for ECS tasks (must have NAT for outbound internet, required if enable_tfc_agent_ecs = true)"
+  type        = list(string)
+  default     = null
 }

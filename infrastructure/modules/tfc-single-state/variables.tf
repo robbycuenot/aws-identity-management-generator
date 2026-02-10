@@ -140,3 +140,13 @@ variable "create_aws_github_oidc_provider" {
   type        = bool
   default     = true
 }
+
+# =============================================================================
+# TFC Agent Configuration (Optional)
+# =============================================================================
+
+variable "agent_pool_id" {
+  description = "TFC agent pool ID for agent execution mode (if null, uses remote execution)"
+  type        = string
+  default     = null
+}
