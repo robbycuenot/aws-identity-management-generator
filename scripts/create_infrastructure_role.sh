@@ -139,11 +139,13 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "iam:AttachRolePolicy",
                 "iam:DetachRolePolicy",
                 "iam:ListAttachedRolePolicies",
-                "iam:ListInstanceProfilesForRole"
+                "iam:ListInstanceProfilesForRole",
+                "iam:PassRole"
             ],
             "Resource": [
                 "arn:aws:iam::${ACCOUNT_ID}:role/tfc-*",
-                "arn:aws:iam::${ACCOUNT_ID}:role/github-actions-*"
+                "arn:aws:iam::${ACCOUNT_ID}:role/github-actions-*",
+                "arn:aws:iam::${ACCOUNT_ID}:role/*-tfc-agent-*"
             ]
         },
         {
@@ -154,6 +156,143 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "iam:GetPolicyVersion"
             ],
             "Resource": "arn:aws:iam::aws:policy/*"
+        },
+        {
+            "Sid": "IAMServiceLinkedRole",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateServiceLinkedRole"
+            ],
+            "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/ecs.amazonaws.com/*"
+        },
+        {
+            "Sid": "ECSManagement",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:CreateCluster",
+                "ecs:DeleteCluster",
+                "ecs:DescribeClusters",
+                "ecs:UpdateCluster",
+                "ecs:PutClusterCapacityProviders",
+                "ecs:TagResource",
+                "ecs:UntagResource",
+                "ecs:ListTagsForResource",
+                "ecs:RegisterTaskDefinition",
+                "ecs:DeregisterTaskDefinition",
+                "ecs:DescribeTaskDefinition",
+                "ecs:ListTaskDefinitions"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "LambdaManagement",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:CreateFunction",
+                "lambda:DeleteFunction",
+                "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration",
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:ListVersionsByFunction",
+                "lambda:PublishVersion",
+                "lambda:AddPermission",
+                "lambda:RemovePermission",
+                "lambda:GetPolicy",
+                "lambda:TagResource",
+                "lambda:UntagResource",
+                "lambda:ListTags"
+            ],
+            "Resource": "arn:aws:lambda:*:${ACCOUNT_ID}:function:*-tfc-agent-*"
+        },
+        {
+            "Sid": "APIGatewayManagement",
+            "Effect": "Allow",
+            "Action": [
+                "apigateway:POST",
+                "apigateway:GET",
+                "apigateway:DELETE",
+                "apigateway:PATCH",
+                "apigateway:PUT",
+                "apigateway:TagResource",
+                "apigateway:UntagResource"
+            ],
+            "Resource": [
+                "arn:aws:apigateway:*::/apis",
+                "arn:aws:apigateway:*::/apis/*",
+                "arn:aws:apigateway:*::/tags/*"
+            ]
+        },
+        {
+            "Sid": "SecretsManagerManagement",
+            "Effect": "Allow",
+            "Action": [
+                "secretsmanager:CreateSecret",
+                "secretsmanager:DeleteSecret",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:PutSecretValue",
+                "secretsmanager:UpdateSecret",
+                "secretsmanager:TagResource",
+                "secretsmanager:UntagResource",
+                "secretsmanager:GetResourcePolicy"
+            ],
+            "Resource": "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-tfc-agent-*"
+        },
+        {
+            "Sid": "CloudWatchLogsManagement",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:DeleteLogGroup",
+                "logs:DescribeLogGroups",
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy",
+                "logs:TagResource",
+                "logs:UntagResource",
+                "logs:ListTagsForResource"
+            ],
+            "Resource": [
+                "arn:aws:logs:*:${ACCOUNT_ID}:log-group:/ecs/*-tfc-agent*",
+                "arn:aws:logs:*:${ACCOUNT_ID}:log-group:/aws/lambda/*-tfc-agent*"
+            ]
+        },
+        {
+            "Sid": "ECRPullThroughCache",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:CreatePullThroughCacheRule",
+                "ecr:DeletePullThroughCacheRule",
+                "ecr:DescribePullThroughCacheRules"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "EC2SecurityGroupManagement",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:CreateSecurityGroup",
+                "ec2:DeleteSecurityGroup",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSecurityGroupRules",
+                "ec2:AuthorizeSecurityGroupEgress",
+                "ec2:RevokeSecurityGroupEgress",
+                "ec2:AuthorizeSecurityGroupIngress",
+                "ec2:RevokeSecurityGroupIngress",
+                "ec2:CreateTags",
+                "ec2:DeleteTags",
+                "ec2:DescribeTags"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "EC2VPCRead",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeVpcs",
+                "ec2:DescribeSubnets"
+            ],
+            "Resource": "*"
         }
     ]
 }
