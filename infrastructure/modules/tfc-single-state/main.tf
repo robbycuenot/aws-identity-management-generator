@@ -71,9 +71,18 @@ resource "tfe_workspace" "identity_management" {
   trigger_patterns = ["${var.output}/**/*"]
 }
 
-resource "tfe_workspace_settings" "identity_management" {
+# Workspace settings - remote execution (default)
+resource "tfe_workspace_settings" "identity_management_remote" {
+  count          = var.agent_pool_id == null ? 1 : 0
   workspace_id   = tfe_workspace.identity_management.id
-  execution_mode = var.agent_pool_id != null ? "agent" : "remote"
+  execution_mode = "remote"
+}
+
+# Workspace settings - agent execution (when agent pool provided)
+resource "tfe_workspace_settings" "identity_management_agent" {
+  count          = var.agent_pool_id != null ? 1 : 0
+  workspace_id   = tfe_workspace.identity_management.id
+  execution_mode = "agent"
   agent_pool_id  = var.agent_pool_id
 }
 
