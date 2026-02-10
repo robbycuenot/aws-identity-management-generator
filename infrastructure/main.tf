@@ -116,6 +116,13 @@ check "tfc_agent_subnets_required" {
   }
 }
 
+check "tfc_agent_docker_hub_credentials" {
+  assert {
+    condition     = !var.enable_tfc_agent_ecs || (var.docker_hub_username != null && var.docker_hub_access_token != null)
+    error_message = "docker_hub_username and docker_hub_access_token are required when enable_tfc_agent_ecs = true (Docker Hub requires authentication for ECR pull-through cache)"
+  }
+}
+
 module "tfc_agent_ecs" {
   count  = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
   source = "./modules/tfc-agent-ecs"
@@ -135,6 +142,10 @@ module "tfc_agent_ecs" {
   vpc_id     = var.tfc_agent_vpc_id
   subnet_ids = var.tfc_agent_subnet_ids
 
+  # Docker Hub credentials for ECR pull-through cache
+  docker_hub_username     = var.docker_hub_username
+  docker_hub_access_token = var.docker_hub_access_token
+
   tags = {
     Environment = var.environment
     Project     = var.prefix
@@ -148,6 +159,14 @@ module "tfc_agent_ecs" {
 # tfc_agent_ecs creates agent pool → tfc_single_state uses agent pool → 
 # notification uses workspace_id from tfc_single_state
 
+# Wait for API Gateway to be fully deployed before TFC tries to verify the webhook
+resource "time_sleep" "wait_for_webhook" {
+  count = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
+
+  depends_on      = [module.tfc_agent_ecs]
+  create_duration = "30s"
+}
+
 resource "tfe_notification_configuration" "tfc_agent_webhook" {
   count = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
 
@@ -160,5 +179,5 @@ resource "tfe_notification_configuration" "tfc_agent_webhook" {
   token            = module.tfc_agent_ecs[0].webhook_secret
 
   # Ensure webhook endpoint is fully deployed before TFC tries to verify it
-  depends_on = [module.tfc_agent_ecs]
+  depends_on = [time_sleep.wait_for_webhook]
 }

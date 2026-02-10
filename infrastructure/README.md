@@ -99,8 +99,12 @@ Set these variables in your TFC workspace:
 | `tfc_agent_tasks_per_run` | terraform | no | Number of ECS tasks to start per run (2 = one for plan, one for apply) | `2` |
 | `tfc_agent_vpc_id` | terraform | no | VPC ID (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `tfc_agent_subnet_ids` | terraform | no | Private subnet IDs with NAT (required if `enable_tfc_agent_ecs = true`) | `null` |
+| `docker_hub_username` | terraform | no | Docker Hub username (required if `enable_tfc_agent_ecs = true`) | `null` |
+| `docker_hub_access_token` | terraform | **yes** | Docker Hub access token (required if `enable_tfc_agent_ecs = true`) | `null` |
 
 Note: `enable_tfc_agent_ecs` is only supported with `deployment_mode = "tfc-single-state"`. Attempting to use it with multi-state mode will fail.
+
+**Docker Hub Credentials:** Docker Hub requires authentication for ECR pull-through cache. Create a Docker Hub access token at https://hub.docker.com/settings/security
 
 ## Outputs
 
@@ -138,13 +142,17 @@ The module can deploy a webhook-triggered Terraform Cloud agent on ECS Fargate. 
 
 ### Usage
 
-Provide your VPC ID and private subnet IDs:
+Provide your VPC ID, private subnet IDs, and Docker Hub credentials:
 
 ```hcl
-enable_tfc_agent_ecs   = true
-tfc_agent_vpc_id       = "vpc-0123456789abcdef0"
-tfc_agent_subnet_ids   = ["subnet-aaa", "subnet-bbb"]
+enable_tfc_agent_ecs      = true
+tfc_agent_vpc_id          = "vpc-0123456789abcdef0"
+tfc_agent_subnet_ids      = ["subnet-aaa", "subnet-bbb"]
+docker_hub_username       = "your-docker-hub-username"
+docker_hub_access_token   = "dckr_pat_xxxxx"  # Mark as sensitive in TFC
 ```
+
+**Note:** Docker Hub requires authentication for ECR pull-through cache. Create an access token at https://hub.docker.com/settings/security
 
 ### What Gets Created
 

@@ -77,6 +77,19 @@ variable "ecr_pull_through_cache_prefix" {
   default     = "docker-hub"
 }
 
+variable "docker_hub_username" {
+  description = "Docker Hub username for pull-through cache authentication. Required since Docker Hub rate limits unauthenticated pulls."
+  type        = string
+  default     = null
+}
+
+variable "docker_hub_access_token" {
+  description = "Docker Hub access token (PAT) for pull-through cache authentication. Create at https://hub.docker.com/settings/security"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
 variable "tfc_agent_log_level" {
   description = "Log level for the TFC agent (trace, debug, info, warn, error)"
   type        = string

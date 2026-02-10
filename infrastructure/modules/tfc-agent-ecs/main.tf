@@ -24,9 +24,29 @@ data "aws_caller_identity" "current" {}
 # ECR Pull-Through Cache
 # =============================================================================
 
+# Docker Hub credentials secret (required for pull-through cache since 2024)
+resource "aws_secretsmanager_secret" "docker_hub_credentials" {
+  count                   = var.docker_hub_username != null ? 1 : 0
+  name                    = "${var.name_prefix}-docker-hub-credentials"
+  description             = "Docker Hub credentials for ECR pull-through cache"
+  recovery_window_in_days = 0
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "docker_hub_credentials" {
+  count     = var.docker_hub_username != null ? 1 : 0
+  secret_id = aws_secretsmanager_secret.docker_hub_credentials[0].id
+  secret_string = jsonencode({
+    username    = var.docker_hub_username
+    accessToken = var.docker_hub_access_token
+  })
+}
+
 resource "aws_ecr_pull_through_cache_rule" "docker_hub" {
   ecr_repository_prefix = var.ecr_pull_through_cache_prefix
   upstream_registry_url = "registry-1.docker.io"
+  credential_arn        = var.docker_hub_username != null ? aws_secretsmanager_secret.docker_hub_credentials[0].arn : null
 }
 
 # =============================================================================

@@ -185,3 +185,16 @@ variable "tfc_agent_subnet_ids" {
   type        = list(string)
   default     = null
 }
+
+variable "docker_hub_username" {
+  description = "Docker Hub username for ECR pull-through cache authentication (required for TFC agent)"
+  type        = string
+  default     = null
+}
+
+variable "docker_hub_access_token" {
+  description = "Docker Hub access token (PAT) for ECR pull-through cache authentication. Create at https://hub.docker.com/settings/security"
+  type        = string
+  default     = null
+  sensitive   = true
+}

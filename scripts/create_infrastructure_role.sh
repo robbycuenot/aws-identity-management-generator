@@ -240,7 +240,10 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "secretsmanager:UntagResource",
                 "secretsmanager:GetResourcePolicy"
             ],
-            "Resource": "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-tfc-agent-*"
+            "Resource": [
+                "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-tfc-agent-*",
+                "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-docker-hub-*"
+            ]
         },
         {
             "Sid": "CloudWatchLogsManagement",
@@ -253,7 +256,17 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "logs:DeleteRetentionPolicy",
                 "logs:TagResource",
                 "logs:UntagResource",
-                "logs:ListTagsForResource"
+                "logs:ListTagsForResource",
+                "logs:TagLogGroup",
+                "logs:UntagLogGroup",
+                "logs:ListTagsLogGroup",
+                "logs:CreateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:UpdateLogDelivery",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies"
             ],
             "Resource": "*"
         },
