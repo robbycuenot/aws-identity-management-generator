@@ -158,4 +158,7 @@ resource "tfe_notification_configuration" "tfc_agent_webhook" {
   triggers         = ["run:created", "run:needs_attention"]
   url              = module.tfc_agent_ecs[0].webhook_url
   token            = module.tfc_agent_ecs[0].webhook_secret
+
+  # Ensure webhook endpoint is fully deployed before TFC tries to verify it
+  depends_on = [module.tfc_agent_ecs]
 }

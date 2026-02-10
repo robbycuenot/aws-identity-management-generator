@@ -163,7 +163,10 @@ PERMISSIONS_POLICY=$(cat <<EOF
             "Action": [
                 "iam:CreateServiceLinkedRole"
             ],
-            "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/ecs.amazonaws.com/*"
+            "Resource": [
+                "arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/ecs.amazonaws.com/*",
+                "arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/pullthroughcache.ecr.amazonaws.com/*"
+            ]
         },
         {
             "Sid": "ECSManagement",
@@ -252,10 +255,7 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "logs:UntagResource",
                 "logs:ListTagsForResource"
             ],
-            "Resource": [
-                "arn:aws:logs:*:${ACCOUNT_ID}:log-group:/ecs/*-tfc-agent*",
-                "arn:aws:logs:*:${ACCOUNT_ID}:log-group:/aws/lambda/*-tfc-agent*"
-            ]
+            "Resource": "*"
         },
         {
             "Sid": "ECRPullThroughCache",

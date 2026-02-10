@@ -21,6 +21,13 @@ output "agent_pool_name" {
 output "webhook_url" {
   description = "Webhook URL for TFC notifications"
   value       = "${aws_apigatewayv2_api.webhook.api_endpoint}/webhook"
+  depends_on  = [aws_lambda_permission.webhook]
+}
+
+output "webhook_ready" {
+  description = "Indicates the webhook endpoint is fully configured and ready to receive requests"
+  value       = true
+  depends_on  = [aws_lambda_permission.webhook, aws_apigatewayv2_stage.webhook]
 }
 
 output "webhook_secret" {
