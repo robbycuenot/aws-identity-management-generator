@@ -86,7 +86,8 @@ module "tfc_single_state" {
   create_aws_github_oidc_provider = var.create_aws_github_oidc_provider
 
   # TFC Agent configuration (optional)
-  agent_pool_id = var.enable_tfc_agent_ecs ? module.tfc_agent_ecs[0].agent_pool_id : null
+  use_agent_execution = var.enable_tfc_agent_ecs
+  agent_pool_id       = var.enable_tfc_agent_ecs ? module.tfc_agent_ecs[0].agent_pool_id : null
 }
 
 # =============================================================================

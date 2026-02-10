@@ -150,3 +150,9 @@ variable "agent_pool_id" {
   type        = string
   default     = null
 }
+
+variable "use_agent_execution" {
+  description = "Use agent execution mode (set to true when agent_pool_id will be provided)"
+  type        = bool
+  default     = false
+}
