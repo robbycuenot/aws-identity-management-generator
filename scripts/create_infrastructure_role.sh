@@ -183,7 +183,11 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "ecs:RegisterTaskDefinition",
                 "ecs:DeregisterTaskDefinition",
                 "ecs:DescribeTaskDefinition",
-                "ecs:ListTaskDefinitions"
+                "ecs:ListTaskDefinitions",
+                "ecs:DescribeTasks",
+                "ecs:ListTasks",
+                "ecs:StopTask",
+                "ecs:RunTask"
             ],
             "Resource": "*"
         },
@@ -195,6 +199,7 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "lambda:DeleteFunction",
                 "lambda:GetFunction",
                 "lambda:GetFunctionConfiguration",
+                "lambda:GetFunctionCodeSigningConfig",
                 "lambda:UpdateFunctionCode",
                 "lambda:UpdateFunctionConfiguration",
                 "lambda:ListVersionsByFunction",
@@ -276,9 +281,27 @@ PERMISSIONS_POLICY=$(cat <<EOF
             "Action": [
                 "ecr:CreatePullThroughCacheRule",
                 "ecr:DeletePullThroughCacheRule",
-                "ecr:DescribePullThroughCacheRules"
+                "ecr:DescribePullThroughCacheRules",
+                "ecr:ValidatePullThroughCacheRule"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "ECRRepositoryManagement",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:DescribeRepositories",
+                "ecr:DeleteRepository",
+                "ecr:ListImages",
+                "ecr:BatchDeleteImage",
+                "ecr:GetRepositoryPolicy",
+                "ecr:SetRepositoryPolicy",
+                "ecr:DeleteRepositoryPolicy",
+                "ecr:TagResource",
+                "ecr:UntagResource",
+                "ecr:ListTagsForResource"
+            ],
+            "Resource": "arn:aws:ecr:*:${ACCOUNT_ID}:repository/docker-hub/*"
         },
         {
             "Sid": "EC2SecurityGroupManagement",
