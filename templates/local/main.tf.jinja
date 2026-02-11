@@ -28,5 +28,8 @@ module "account_assignments" {
 
 module "team" {
   source = "./team"
+
+  # Pass permission sets map to avoid redundant API calls in eligibility modules
+  permission_sets_map = module.permission_sets.permission_sets_map
 }
 {% endif %}

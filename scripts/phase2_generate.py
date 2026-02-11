@@ -248,6 +248,8 @@ def copy_templates(source_dir: Path, target_dir: Path, ctx: GeneratorContext):
         'aws_ssoadmin_account_assignments_map.tf.jinja',
         'data.tf.jinja',
         'main.tf.jinja',
+        'locals.tf.jinja',
+        'locals_local.tf.jinja',
     }
     
     # Skip data source template when using static ARNs (default)
@@ -1150,9 +1152,17 @@ def render_team_locals_tf(ctx: GeneratorContext):
         ous = []
         ctx.log("[GENERATE] No organizational units found, skipping ou_map")
     
+    # Select template based on state mode
+    # Single-state: uses var.permission_sets_map (passed from root module)
+    # Multi-state: uses data.tfe_outputs.permission_sets (fetched from TFC)
+    if ctx.is_single_state():
+        template_name = "locals_local.tf.jinja"
+    else:
+        template_name = "locals.tf.jinja"
+    
     render_template(
         ctx,
-        template_name="locals.tf.jinja",
+        template_name=template_name,
         output_name="locals.tf",
         data={'accounts': accounts, 'organizational_units': ous},
         output_folder="team"

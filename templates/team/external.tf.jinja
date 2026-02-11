@@ -1,0 +1,7 @@
+# External data sources for multi-state TFC mode
+# Fetches permission_sets_map from the permission_sets workspace
+
+data "tfe_outputs" "permission_sets" {
+  organization = "{{ tfe_organization }}"
+  workspace = "{{ workspace_permission_sets }}"
+}

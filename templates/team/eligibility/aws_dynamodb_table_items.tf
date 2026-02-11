@@ -47,13 +47,13 @@ resource "aws_dynamodb_table_item" "settings_table_settings_item" {
     },
     permissions = {
       "L" = [
-        for permission_set in data.aws_ssoadmin_permission_set.permission_sets : {
+        for ps_name in var.permission_sets : {
           "M" = {
             "id"  = {
-              "S" = permission_set.arn 
+              "S" = var.environment_data.permission_sets_map[ps_name]
             },
             "name" = {
-              "S" = permission_set.name 
+              "S" = ps_name
             }
           }
         }

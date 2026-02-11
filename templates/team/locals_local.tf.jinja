@@ -27,9 +27,6 @@ locals {
   sso_instance = tolist(data.aws_ssoadmin_instances.instances.arns)[0]
   sso_identity_store_id = tolist(data.aws_ssoadmin_instances.instances.identity_store_ids)[0]
 
-  # Permission sets map from tfe_outputs (multi-state TFC mode)
-  permission_sets_map = data.tfe_outputs.permission_sets.nonsensitive_values.permission_sets_map
-
   eligibility_environment_data = {
     account_map_by_name = local.account_map_by_name
     ou_map_by_name = local.ou_map_by_name
@@ -37,7 +34,7 @@ locals {
     sso_identity_store_id = local.sso_identity_store_id
     sso_instance = local.sso_instance
     table = data.aws_dynamodb_table.eligibility_table
-    permission_sets_map = local.permission_sets_map
+    permission_sets_map = var.permission_sets_map
   }
 
   approver_environment_data = {

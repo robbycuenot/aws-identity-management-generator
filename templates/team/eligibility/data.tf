@@ -24,9 +24,5 @@ data "aws_identitystore_user" "entity_user" {
   }
 }
 
-data "aws_ssoadmin_permission_set" "permission_sets" {
-  for_each = toset(var.permission_sets)
-
-  instance_arn = var.environment_data.sso_instance
-  name         = each.key
-}
+# Permission sets are now passed via environment_data.permission_sets_map
+# to avoid redundant API calls across multiple eligibility modules

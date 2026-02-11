@@ -1,0 +1,8 @@
+# Variables for team module (single-state mode)
+# These are passed from the root module to avoid redundant API calls
+
+variable "permission_sets_map" {
+  description = "Map of permission set names to their ARNs (passed from permission_sets module)"
+  type        = map(string)
+  default     = {}
+}
