@@ -106,9 +106,21 @@ variable "tfc_agent_log_level" {
 # =============================================================================
 
 variable "tasks_per_run" {
-  description = "Number of ECS tasks to start per TFC webhook event. Default is 1 since run:needs_attention triggers on apply approval."
+  description = "DEPRECATED - Use max_agents instead. Kept for backwards compatibility."
   type        = number
   default     = 1
+}
+
+variable "max_agents" {
+  description = "Maximum number of concurrent ECS agent tasks"
+  type        = number
+  default     = 3
+}
+
+variable "idle_timeout_minutes" {
+  description = "Minutes of idle time before an agent is stopped"
+  type        = number
+  default     = 15
 }
 
 variable "cpu" {

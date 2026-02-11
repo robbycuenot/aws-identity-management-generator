@@ -331,6 +331,59 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "ec2:DescribeSubnets"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "DynamoDBAgentState",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:CreateTable",
+                "dynamodb:DeleteTable",
+                "dynamodb:DescribeTable",
+                "dynamodb:UpdateTable",
+                "dynamodb:DescribeTimeToLive",
+                "dynamodb:UpdateTimeToLive",
+                "dynamodb:TagResource",
+                "dynamodb:UntagResource",
+                "dynamodb:ListTagsOfResource",
+                "dynamodb:DescribeContinuousBackups"
+            ],
+            "Resource": "arn:aws:dynamodb:*:${ACCOUNT_ID}:table/*-tfc-agent-*"
+        },
+        {
+            "Sid": "EventBridgeScheduler",
+            "Effect": "Allow",
+            "Action": [
+                "scheduler:CreateSchedule",
+                "scheduler:DeleteSchedule",
+                "scheduler:GetSchedule",
+                "scheduler:UpdateSchedule",
+                "scheduler:ListSchedules",
+                "scheduler:TagResource",
+                "scheduler:UntagResource",
+                "scheduler:ListTagsForResource"
+            ],
+            "Resource": "arn:aws:scheduler:*:${ACCOUNT_ID}:schedule/default/*-tfc-agent-*"
+        },
+        {
+            "Sid": "IAMSchedulerRole",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:UpdateRole",
+                "iam:UpdateAssumeRolePolicy",
+                "iam:TagRole",
+                "iam:UntagRole",
+                "iam:ListRoleTags",
+                "iam:PutRolePolicy",
+                "iam:GetRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:ListRolePolicies",
+                "iam:ListAttachedRolePolicies",
+                "iam:PassRole"
+            ],
+            "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/*-tfc-agent-scheduler-role"
         }
     ]
 }

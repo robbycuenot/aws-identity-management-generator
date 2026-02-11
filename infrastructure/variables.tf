@@ -168,10 +168,16 @@ variable "tfc_agent_name" {
   default     = "ecs-agent"
 }
 
-variable "tfc_agent_tasks_per_run" {
-  description = "Number of ECS tasks to start per TFC webhook event. Default is 1 since run:needs_attention triggers on apply approval."
+variable "tfc_agent_max_agents" {
+  description = "Maximum number of concurrent ECS agent tasks"
   type        = number
-  default     = 1
+  default     = 3
+}
+
+variable "tfc_agent_idle_timeout_minutes" {
+  description = "Minutes of idle time before an agent is stopped"
+  type        = number
+  default     = 15
 }
 
 variable "tfc_agent_vpc_id" {

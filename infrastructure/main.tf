@@ -136,7 +136,10 @@ module "tfc_agent_ecs" {
   name_prefix      = "${var.prefix}-${var.environment}-tfc-agent"
   tfc_organization = var.tfc_organization_name
   tfc_agent_name   = var.tfc_agent_name
-  tasks_per_run    = var.tfc_agent_tasks_per_run
+
+  # Lifecycle manager configuration
+  max_agents           = var.tfc_agent_max_agents
+  idle_timeout_minutes = var.tfc_agent_idle_timeout_minutes
 
   # VPC configuration
   vpc_id     = var.tfc_agent_vpc_id

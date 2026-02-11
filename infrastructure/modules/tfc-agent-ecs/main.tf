@@ -1,5 +1,5 @@
-# TFC Agent on ECS Fargate
-# Webhook-triggered single-execution mode - tasks start on demand and exit after one job
+# TFC Agent on ECS Fargate with Lifecycle Manager
+# Long-running agents with auto-scaling and idle shutdown
 
 locals {
   common_tags = merge(var.tags, {
@@ -151,6 +151,34 @@ resource "aws_secretsmanager_secret_version" "webhook_secret" {
 }
 
 # =============================================================================
+# DynamoDB - Agent State Table
+# =============================================================================
+
+resource "aws_dynamodb_table" "agent_state" {
+  name         = "${var.name_prefix}-state"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = local.common_tags
+}
+
+# =============================================================================
 # CloudWatch Log Groups
 # =============================================================================
 
@@ -161,8 +189,15 @@ resource "aws_cloudwatch_log_group" "tfc_agent" {
   tags = local.common_tags
 }
 
-resource "aws_cloudwatch_log_group" "webhook_lambda" {
-  name              = "/aws/lambda/${var.name_prefix}-webhook"
+resource "aws_cloudwatch_log_group" "lifecycle_lambda" {
+  name              = "/aws/lambda/${var.name_prefix}-lifecycle"
+  retention_in_days = var.log_retention_days
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "idle_checker_lambda" {
+  name              = "/aws/lambda/${var.name_prefix}-idle-checker"
   retention_in_days = var.log_retention_days
 
   tags = local.common_tags
@@ -193,7 +228,6 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
     capacity_provider = "FARGATE"
   }
 }
-
 
 # =============================================================================
 # IAM Roles - ECS Task Execution
@@ -317,7 +351,7 @@ resource "aws_iam_role_policy" "ecs_exec" {
 }
 
 # =============================================================================
-# ECS Task Definition (Single-Execution Mode)
+# ECS Task Definition (Long-Running Mode)
 # =============================================================================
 
 resource "aws_ecs_task_definition" "tfc_agent" {
@@ -346,11 +380,8 @@ resource "aws_ecs_task_definition" "tfc_agent" {
       {
         name  = "TFC_AGENT_LOG_LEVEL"
         value = var.tfc_agent_log_level
-      },
-      {
-        name  = "TFC_AGENT_SINGLE"
-        value = "true"  # Single-execution mode - exit after one job
       }
+      # Note: TFC_AGENT_SINGLE is NOT set - agent runs continuously
     ]
 
     secrets = [
@@ -375,19 +406,18 @@ resource "aws_ecs_task_definition" "tfc_agent" {
   depends_on = [aws_ecr_pull_through_cache_rule.docker_hub]
 }
 
-
 # =============================================================================
-# Lambda - Webhook Handler
+# Lambda - Lifecycle Manager (Webhook Handler)
 # =============================================================================
 
-data "archive_file" "webhook_lambda" {
+data "archive_file" "lifecycle_lambda" {
   type        = "zip"
-  source_file = "${path.module}/lambda/webhook_handler.py"
-  output_path = "${path.module}/lambda/webhook_handler.zip"
+  source_file = "${path.module}/lambda/lifecycle_manager.py"
+  output_path = "${path.module}/lambda/lifecycle_manager.zip"
 }
 
-resource "aws_iam_role" "webhook_lambda" {
-  name = "${var.name_prefix}-webhook-lambda-role"
+resource "aws_iam_role" "lifecycle_lambda" {
+  name = "${var.name_prefix}-lifecycle-lambda-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -403,9 +433,9 @@ resource "aws_iam_role" "webhook_lambda" {
   tags = local.common_tags
 }
 
-resource "aws_iam_role_policy" "webhook_lambda" {
-  name = "webhook-lambda-policy"
-  role = aws_iam_role.webhook_lambda.id
+resource "aws_iam_role_policy" "lifecycle_lambda" {
+  name = "lifecycle-lambda-policy"
+  role = aws_iam_role.lifecycle_lambda.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -417,16 +447,29 @@ resource "aws_iam_role_policy" "webhook_lambda" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "${aws_cloudwatch_log_group.webhook_lambda.arn}:*"
+        Resource = "${aws_cloudwatch_log_group.lifecycle_lambda.arn}:*"
+      },
+      {
+        Sid    = "DynamoDB"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ]
+        Resource = aws_dynamodb_table.agent_state.arn
       },
       {
         Sid    = "ECSRunTask"
         Effect = "Allow"
         Action = [
-          "ecs:RunTask"
+          "ecs:RunTask",
+          "ecs:DescribeTasks"
         ]
-        # Use wildcard for task definition revisions
-        Resource = "arn:aws:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${var.name_prefix}:*"
+        Resource = "*"
       },
       {
         Sid    = "ECSPassRole"
@@ -443,29 +486,181 @@ resource "aws_iam_role_policy" "webhook_lambda" {
   })
 }
 
-resource "aws_lambda_function" "webhook" {
-  function_name    = "${var.name_prefix}-webhook"
-  role             = aws_iam_role.webhook_lambda.arn
-  handler          = "webhook_handler.handler"
+resource "aws_lambda_function" "lifecycle" {
+  function_name    = "${var.name_prefix}-lifecycle"
+  role             = aws_iam_role.lifecycle_lambda.arn
+  handler          = "lifecycle_manager.handler"
   runtime          = "python3.12"
   timeout          = 30
-  filename         = data.archive_file.webhook_lambda.output_path
-  source_code_hash = data.archive_file.webhook_lambda.output_base64sha256
+  filename         = data.archive_file.lifecycle_lambda.output_path
+  source_code_hash = data.archive_file.lifecycle_lambda.output_base64sha256
 
   environment {
     variables = {
-      CLUSTER_ARN     = aws_ecs_cluster.main.arn
-      TASK_DEFINITION = aws_ecs_task_definition.tfc_agent.arn
-      SUBNETS         = join(",", var.subnet_ids)
-      SECURITY_GROUP  = aws_security_group.ecs_tasks.id
-      WEBHOOK_SECRET  = random_password.webhook_secret.result
-      TASKS_PER_RUN   = tostring(var.tasks_per_run)
+      CLUSTER_ARN          = aws_ecs_cluster.main.arn
+      TASK_DEFINITION      = aws_ecs_task_definition.tfc_agent.arn
+      SUBNETS              = join(",", var.subnet_ids)
+      SECURITY_GROUP       = aws_security_group.ecs_tasks.id
+      WEBHOOK_SECRET       = random_password.webhook_secret.result
+      TABLE_NAME           = aws_dynamodb_table.agent_state.name
+      MAX_AGENTS           = tostring(var.max_agents)
+      IDLE_TIMEOUT_MINUTES = tostring(var.idle_timeout_minutes)
     }
   }
 
-  depends_on = [aws_cloudwatch_log_group.webhook_lambda]
+  depends_on = [aws_cloudwatch_log_group.lifecycle_lambda]
 
   tags = local.common_tags
+}
+
+# =============================================================================
+# Lambda - Idle Checker (Scheduled)
+# =============================================================================
+
+data "archive_file" "idle_checker_lambda" {
+  type        = "zip"
+  source_file = "${path.module}/lambda/idle_checker.py"
+  output_path = "${path.module}/lambda/idle_checker.zip"
+}
+
+resource "aws_iam_role" "idle_checker_lambda" {
+  name = "${var.name_prefix}-idle-checker-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "idle_checker_lambda" {
+  name = "idle-checker-lambda-policy"
+  role = aws_iam_role.idle_checker_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Logs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.idle_checker_lambda.arn}:*"
+      },
+      {
+        Sid    = "DynamoDB"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ]
+        Resource = aws_dynamodb_table.agent_state.arn
+      },
+      {
+        Sid    = "ECS"
+        Effect = "Allow"
+        Action = [
+          "ecs:StopTask",
+          "ecs:DescribeTasks"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "idle_checker" {
+  function_name    = "${var.name_prefix}-idle-checker"
+  role             = aws_iam_role.idle_checker_lambda.arn
+  handler          = "idle_checker.handler"
+  runtime          = "python3.12"
+  timeout          = 60
+  filename         = data.archive_file.idle_checker_lambda.output_path
+  source_code_hash = data.archive_file.idle_checker_lambda.output_base64sha256
+
+  environment {
+    variables = {
+      CLUSTER_ARN          = aws_ecs_cluster.main.arn
+      TABLE_NAME           = aws_dynamodb_table.agent_state.name
+      IDLE_TIMEOUT_MINUTES = tostring(var.idle_timeout_minutes)
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.idle_checker_lambda]
+
+  tags = local.common_tags
+}
+
+# =============================================================================
+# EventBridge - Idle Checker Schedule
+# =============================================================================
+
+resource "aws_scheduler_schedule" "idle_checker" {
+  name       = "${var.name_prefix}-idle-checker"
+  group_name = "default"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  # Run every 5 minutes
+  schedule_expression = "rate(5 minutes)"
+
+  target {
+    arn      = aws_lambda_function.idle_checker.arn
+    role_arn = aws_iam_role.scheduler.arn
+  }
+}
+
+resource "aws_iam_role" "scheduler" {
+  name = "${var.name_prefix}-scheduler-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "scheduler" {
+  name = "invoke-lambda"
+  role = aws_iam_role.scheduler.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.idle_checker.arn
+    }]
+  })
+}
+
+# Allow EventBridge Scheduler to invoke the idle checker Lambda
+resource "aws_lambda_permission" "scheduler" {
+  statement_id  = "AllowEventBridgeScheduler"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.idle_checker.function_name
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.idle_checker.arn
 }
 
 # =============================================================================
@@ -485,7 +680,7 @@ resource "aws_apigatewayv2_stage" "webhook" {
   auto_deploy = true
 
   access_log_settings {
-    destination_arn = aws_cloudwatch_log_group.webhook_lambda.arn
+    destination_arn = aws_cloudwatch_log_group.lifecycle_lambda.arn
     format = jsonencode({
       requestId      = "$context.requestId"
       ip             = "$context.identity.sourceIp"
@@ -503,7 +698,7 @@ resource "aws_apigatewayv2_stage" "webhook" {
 resource "aws_apigatewayv2_integration" "webhook" {
   api_id                 = aws_apigatewayv2_api.webhook.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.webhook.invoke_arn
+  integration_uri        = aws_lambda_function.lifecycle.invoke_arn
   payload_format_version = "2.0"
 }
 
@@ -516,7 +711,7 @@ resource "aws_apigatewayv2_route" "webhook" {
 resource "aws_lambda_permission" "webhook" {
   statement_id  = "AllowAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.webhook.function_name
+  function_name = aws_lambda_function.lifecycle.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.webhook.execution_arn}/*/*"
 }

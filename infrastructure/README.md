@@ -96,7 +96,8 @@ Set these variables in your TFC workspace:
 |----------|------|-----------|-------------|---------|
 | `enable_tfc_agent_ecs` | terraform | no | Enable TFC agent on ECS Fargate (single-state mode only) | `false` |
 | `tfc_agent_name` | terraform | no | Name for the TFC agent (appears in TFC UI) | `ecs-agent` |
-| `tfc_agent_tasks_per_run` | terraform | no | Number of ECS tasks to start per webhook event | `1` |
+| `tfc_agent_max_agents` | terraform | no | Maximum number of concurrent ECS agent tasks | `3` |
+| `tfc_agent_idle_timeout_minutes` | terraform | no | Minutes of idle time before an agent is stopped | `15` |
 | `tfc_agent_vpc_id` | terraform | no | VPC ID (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `tfc_agent_subnet_ids` | terraform | no | Private subnet IDs with NAT (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `docker_hub_username` | terraform | no | Docker Hub username (required if `enable_tfc_agent_ecs = true`) | `null` |
@@ -128,28 +129,34 @@ Note: `enable_tfc_agent_ecs` is only supported with `deployment_mode = "tfc-sing
 | `tfc_agent_vpc_id` | ID of the VPC |
 | `tfc_agent_subnet_ids` | Subnet IDs used by ECS tasks |
 | `tfc_agent_cloudwatch_log_group` | CloudWatch log group for agent logs |
+| `tfc_agent_state_table_name` | DynamoDB table for agent state tracking |
 
 ## TFC Agent on ECS Fargate (Single-State Mode Only)
 
-The module can deploy a webhook-triggered Terraform Cloud agent on ECS Fargate. This is only available when using `deployment_mode = "tfc-single-state"`.
+The module can deploy Terraform Cloud agents on ECS Fargate with intelligent lifecycle management. This is only available when using `deployment_mode = "tfc-single-state"`.
 
-- **Single-execution mode**: Tasks start on demand, execute one job, then exit
-- **Pay only for execution time**: No idle costs
+### Features
+
+- **Long-running agents**: Agents stay alive and handle multiple jobs (not single-execution mode)
+- **Auto-scaling**: Scales up to `max_agents` based on incoming work
+- **Idle shutdown**: Agents automatically stop after `idle_timeout_minutes` of inactivity
+- **DynamoDB state tracking**: Coordinates agent lifecycle across Lambda invocations
 - **16 vCPU, 32 GB RAM, 200 GB storage** (maximum Fargate configuration)
 - **ECR pull-through cache**: Images cached in your account
-- **Webhook-triggered**: TFC notifications start ECS tasks automatically
-- **Automatic workspace configuration**: The workspace is automatically configured to use agent execution mode
+- **Webhook-triggered**: TFC notifications manage agent lifecycle automatically
 
 ### Usage
 
 Provide your VPC ID, private subnet IDs, and Docker Hub credentials:
 
 ```hcl
-enable_tfc_agent_ecs      = true
-tfc_agent_vpc_id          = "vpc-0123456789abcdef0"
-tfc_agent_subnet_ids      = ["subnet-aaa", "subnet-bbb"]
-docker_hub_username       = "your-docker-hub-username"
-docker_hub_access_token   = "dckr_pat_xxxxx"  # Mark as sensitive in TFC
+enable_tfc_agent_ecs           = true
+tfc_agent_vpc_id               = "vpc-0123456789abcdef0"
+tfc_agent_subnet_ids           = ["subnet-aaa", "subnet-bbb"]
+tfc_agent_max_agents           = 3   # Maximum concurrent agents
+tfc_agent_idle_timeout_minutes = 15  # Stop agents after 15 minutes idle
+docker_hub_username            = "your-docker-hub-username"
+docker_hub_access_token        = "dckr_pat_xxxxx"  # Mark as sensitive in TFC
 ```
 
 **Note:** Docker Hub requires authentication for ECR pull-through cache. Create an access token at https://hub.docker.com/settings/security
@@ -159,30 +166,47 @@ docker_hub_access_token   = "dckr_pat_xxxxx"  # Mark as sensitive in TFC
 **In Terraform Cloud:**
 - Agent pool (organization-scoped)
 - Agent token (stored in AWS Secrets Manager)
+- Notification configuration (webhook triggers)
 
 **In AWS:**
 - API Gateway HTTP endpoint (webhook receiver)
-- Lambda function (starts ECS tasks on webhook)
+- Lambda function - Lifecycle Manager (handles webhooks, starts agents)
+- Lambda function - Idle Checker (runs every 5 minutes, stops idle agents)
+- EventBridge Scheduler (triggers idle checker)
+- DynamoDB table (tracks agent state and run events)
 - ECR pull-through cache rule for Docker Hub
 - ECS cluster with Fargate capacity provider
-- ECS task definition (single-execution mode)
+- ECS task definition (long-running mode)
 - Security group allowing outbound traffic
-- IAM roles for Lambda, task execution, and ECS Exec
+- IAM roles for Lambda, scheduler, task execution, and ECS Exec
 - CloudWatch log groups for Lambda and ECS tasks
 
 ### How It Works
 
 ```
-TFC Run Created → Webhook POST → API Gateway → Lambda → ECS RunTask
-                                                            ↓
-                                              Task picks up job, executes, exits
+TFC Run Created → Webhook POST → API Gateway → Lifecycle Manager Lambda
+                                                        ↓
+                                              Check active agents in DynamoDB
+                                                        ↓
+                                              Scale up if needed (up to max_agents)
+                                                        ↓
+                                              Agent picks up job, executes
+                                                        ↓
+                                              Idle Checker (every 5 min) stops idle agents
 ```
 
-1. When a run is created in the workspace, TFC sends a webhook
-2. API Gateway receives the webhook and invokes Lambda
-3. Lambda verifies the HMAC signature and starts 2 ECS tasks
-4. Tasks connect to TFC, pick up the plan/apply jobs, execute, then exit
-5. You only pay for actual execution time
+**Webhook Events:**
+- `run:created` - New run started, ensures agents are available
+- `run:needs_attention` - Run waiting for approval, keeps agents alive
+- `run:applying` - Apply phase started, ensures agents are available
+
+**Lifecycle Flow:**
+1. When a run is created, TFC sends a webhook to the Lifecycle Manager
+2. Lifecycle Manager checks DynamoDB for active agents
+3. If under `max_agents`, starts a new ECS task
+4. Agent connects to TFC agent pool and picks up jobs
+5. Every 5 minutes, Idle Checker scans DynamoDB for idle agents
+6. Agents idle longer than `idle_timeout_minutes` are stopped
 
 ### ECR Pull-Through Cache
 
@@ -203,8 +227,11 @@ The image path becomes:
 # ECS task logs
 aws logs tail /ecs/aws-identity-management-<environment>-tfc-agent --follow
 
-# Webhook Lambda logs
-aws logs tail /aws/lambda/aws-identity-management-<environment>-tfc-agent-webhook --follow
+# Lifecycle Manager Lambda logs
+aws logs tail /aws/lambda/aws-identity-management-<environment>-tfc-agent-lifecycle --follow
+
+# Idle Checker Lambda logs
+aws logs tail /aws/lambda/aws-identity-management-<environment>-tfc-agent-idle-checker --follow
 ```
 
 ### Debugging with ECS Exec
@@ -216,6 +243,14 @@ TASK_ARN=$(aws ecs list-tasks --cluster aws-identity-management-<environment>-tf
 # Connect to container
 aws ecs execute-command --cluster aws-identity-management-<environment>-tfc-agent-cluster --task $TASK_ARN --container tfc-agent --interactive --command /bin/sh
 ```
+
+### DynamoDB State Table
+
+The agent state table tracks:
+- **Agent records** (`pk=AGENT#<task-id>`, `sk=METADATA`): Task ARN, status, started_at, last_activity
+- **Run events** (`pk=RUN#<run-id>`, `sk=EVENT#<type>#<timestamp>`): Event history for debugging
+
+Records have TTL for automatic cleanup (24 hours for agents, 7 days for run events).
 
 ## GitHub Actions Variables
 

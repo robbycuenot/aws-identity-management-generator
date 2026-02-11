@@ -15,7 +15,7 @@ output "agent_pool_name" {
 }
 
 # =============================================================================
-# Webhook
+# Webhook / Lifecycle Manager
 # =============================================================================
 
 output "webhook_url" {
@@ -36,9 +36,28 @@ output "webhook_secret" {
   sensitive   = true
 }
 
-output "webhook_lambda_function_name" {
-  description = "Name of the webhook Lambda function"
-  value       = aws_lambda_function.webhook.function_name
+output "lifecycle_lambda_function_name" {
+  description = "Name of the lifecycle manager Lambda function"
+  value       = aws_lambda_function.lifecycle.function_name
+}
+
+output "idle_checker_lambda_function_name" {
+  description = "Name of the idle checker Lambda function"
+  value       = aws_lambda_function.idle_checker.function_name
+}
+
+# =============================================================================
+# DynamoDB
+# =============================================================================
+
+output "agent_state_table_name" {
+  description = "Name of the DynamoDB table for agent state tracking"
+  value       = aws_dynamodb_table.agent_state.name
+}
+
+output "agent_state_table_arn" {
+  description = "ARN of the DynamoDB table for agent state tracking"
+  value       = aws_dynamodb_table.agent_state.arn
 }
 
 # =============================================================================
@@ -84,9 +103,14 @@ output "cloudwatch_log_group_name" {
   value       = aws_cloudwatch_log_group.tfc_agent.name
 }
 
-output "webhook_log_group_name" {
-  description = "Name of the CloudWatch log group for webhook Lambda"
-  value       = aws_cloudwatch_log_group.webhook_lambda.name
+output "lifecycle_log_group_name" {
+  description = "Name of the CloudWatch log group for lifecycle manager Lambda"
+  value       = aws_cloudwatch_log_group.lifecycle_lambda.name
+}
+
+output "idle_checker_log_group_name" {
+  description = "Name of the CloudWatch log group for idle checker Lambda"
+  value       = aws_cloudwatch_log_group.idle_checker_lambda.name
 }
 
 # =============================================================================
