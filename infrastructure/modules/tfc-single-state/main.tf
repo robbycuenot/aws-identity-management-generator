@@ -56,6 +56,7 @@ resource "tfe_workspace" "identity_management" {
   description         = "Manages all IAM Identity Center resources (users, groups, permission sets, account assignments)"
   allow_destroy_plan  = false
   force_delete        = true
+  speculative_enabled = var.use_agent_execution ? false : true  # Disable for agent mode (no webhook for speculative plans)
 
   vcs_repo {
     identifier                 = "${var.github_owner}/${var.github_repo}"

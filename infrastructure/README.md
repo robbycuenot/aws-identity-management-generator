@@ -98,6 +98,8 @@ Set these variables in your TFC workspace:
 | `tfc_agent_name` | terraform | no | Name for the TFC agent (appears in TFC UI) | `ecs-agent` |
 | `tfc_agent_max_agents` | terraform | no | Maximum number of concurrent ECS agent tasks | `3` |
 | `tfc_agent_idle_timeout_minutes` | terraform | no | Minutes of idle time before an agent is stopped | `15` |
+
+**Note:** When `enable_tfc_agent_ecs = true`, speculative plans are automatically disabled on the workspace. TFC doesn't send webhook notifications for speculative plans, so agents wouldn't spin up to handle them.
 | `tfc_agent_vpc_id` | terraform | no | VPC ID (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `tfc_agent_subnet_ids` | terraform | no | Private subnet IDs with NAT (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `docker_hub_username` | terraform | no | Docker Hub username (required if `enable_tfc_agent_ecs = true`) | `null` |
