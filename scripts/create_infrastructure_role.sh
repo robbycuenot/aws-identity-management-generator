@@ -328,7 +328,8 @@ PERMISSIONS_POLICY=$(cat <<EOF
             "Effect": "Allow",
             "Action": [
                 "ec2:DescribeVpcs",
-                "ec2:DescribeSubnets"
+                "ec2:DescribeSubnets",
+                "ec2:DescribeNetworkInterfaces"
             ],
             "Resource": "*"
         },
