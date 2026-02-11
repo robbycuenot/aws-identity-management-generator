@@ -221,17 +221,9 @@ def handler(event, context):
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
     signature = headers.get('x-tfe-notification-signature', '')
     
-    # Verify signature
-    if not verify_signature(body.encode(), signature):
-        print("Invalid signature")
-        return {
-            'statusCode': 401,
-            'body': json.dumps({'error': 'Invalid signature'})
-        }
-    
-    # Parse payload
+    # Parse payload first to check for verification request
     try:
-        payload = json.loads(body)
+        payload = json.loads(body) if body else {}
     except json.JSONDecodeError as e:
         print(f"Invalid JSON: {e}")
         return {
@@ -239,12 +231,21 @@ def handler(event, context):
             'body': json.dumps({'error': 'Invalid JSON'})
         }
     
-    # Handle verification request (TFC sends this when creating notification)
+    # Handle verification request BEFORE signature check
+    # TFC sends this when creating/updating notification configuration
     if payload.get('payload_version') == 1 and 'verification' in str(payload):
         print("Verification request - responding OK")
         return {
             'statusCode': 200,
             'body': json.dumps({'status': 'ok'})
+        }
+    
+    # Verify signature for all other requests
+    if not verify_signature(body.encode(), signature):
+        print("Invalid signature")
+        return {
+            'statusCode': 401,
+            'body': json.dumps({'error': 'Invalid signature'})
         }
     
     # Extract run info
