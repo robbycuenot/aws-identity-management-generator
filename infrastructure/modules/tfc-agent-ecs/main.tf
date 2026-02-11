@@ -25,9 +25,10 @@ data "aws_caller_identity" "current" {}
 # =============================================================================
 
 # Docker Hub credentials secret (required for pull-through cache since 2024)
+# Secret name MUST match pattern: ecr-pullthroughcache/*
 resource "aws_secretsmanager_secret" "docker_hub_credentials" {
   count                   = var.docker_hub_username != null ? 1 : 0
-  name                    = "${var.name_prefix}-docker-hub-credentials"
+  name                    = "ecr-pullthroughcache/${var.name_prefix}-docker-hub"
   description             = "Docker Hub credentials for ECR pull-through cache"
   recovery_window_in_days = 0
 

@@ -242,7 +242,7 @@ PERMISSIONS_POLICY=$(cat <<EOF
             ],
             "Resource": [
                 "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-tfc-agent-*",
-                "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-docker-hub-*"
+                "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:ecr-pullthroughcache/*"
             ]
         },
         {
