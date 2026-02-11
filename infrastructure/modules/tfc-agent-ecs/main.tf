@@ -497,14 +497,15 @@ resource "aws_lambda_function" "lifecycle" {
 
   environment {
     variables = {
-      CLUSTER_ARN          = aws_ecs_cluster.main.arn
-      TASK_DEFINITION      = aws_ecs_task_definition.tfc_agent.arn
-      SUBNETS              = join(",", var.subnet_ids)
-      SECURITY_GROUP       = aws_security_group.ecs_tasks.id
-      WEBHOOK_SECRET       = random_password.webhook_secret.result
-      TABLE_NAME           = aws_dynamodb_table.agent_state.name
-      MAX_AGENTS           = tostring(var.max_agents)
-      IDLE_TIMEOUT_MINUTES = tostring(var.idle_timeout_minutes)
+      CLUSTER_ARN           = aws_ecs_cluster.main.arn
+      TASK_DEFINITION       = aws_ecs_task_definition.tfc_agent.arn
+      SUBNETS               = join(",", var.subnet_ids)
+      SECURITY_GROUP        = aws_security_group.ecs_tasks.id
+      WEBHOOK_SECRET        = random_password.webhook_secret.result
+      GITHUB_WEBHOOK_SECRET = var.enable_github_webhook ? random_password.github_webhook_secret[0].result : ""
+      TABLE_NAME            = aws_dynamodb_table.agent_state.name
+      MAX_AGENTS            = tostring(var.max_agents)
+      IDLE_TIMEOUT_MINUTES  = tostring(var.idle_timeout_minutes)
     }
   }
 
@@ -714,4 +715,45 @@ resource "aws_lambda_permission" "webhook" {
   function_name = aws_lambda_function.lifecycle.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.webhook.execution_arn}/*/*"
+}
+
+# =============================================================================
+# GitHub Webhook (for speculative plan support)
+# =============================================================================
+
+# Separate webhook secret for GitHub (uses HMAC-SHA256, different from TFC's SHA512)
+resource "random_password" "github_webhook_secret" {
+  count   = var.enable_github_webhook ? 1 : 0
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "github_webhook_secret" {
+  count                   = var.enable_github_webhook ? 1 : 0
+  name                    = "${var.name_prefix}-github-webhook-secret"
+  description             = "HMAC secret for GitHub webhook verification"
+  recovery_window_in_days = 0
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "github_webhook_secret" {
+  count         = var.enable_github_webhook ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.github_webhook_secret[0].id
+  secret_string = random_password.github_webhook_secret[0].result
+}
+
+resource "github_repository_webhook" "agent_trigger" {
+  count      = var.enable_github_webhook ? 1 : 0
+  repository = var.github_repository
+
+  configuration {
+    url          = "${aws_apigatewayv2_api.webhook.api_endpoint}/webhook"
+    content_type = "json"
+    secret       = random_password.github_webhook_secret[0].result
+    insecure_ssl = false
+  }
+
+  active = true
+  events = ["pull_request"]
 }

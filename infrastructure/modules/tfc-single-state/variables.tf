@@ -156,3 +156,9 @@ variable "use_agent_execution" {
   type        = bool
   default     = false
 }
+
+variable "enable_speculative_plans" {
+  description = "Enable speculative plans (auto-disabled for agent mode unless GitHub webhook is enabled)"
+  type        = bool
+  default     = null  # null = auto-determine based on execution mode
+}

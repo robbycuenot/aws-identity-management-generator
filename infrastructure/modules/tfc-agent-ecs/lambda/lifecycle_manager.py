@@ -6,6 +6,7 @@ Manages ECS Fargate agents for Terraform Cloud runs with:
 - Auto-scaling based on pending work
 - Auto-shutdown after idle timeout
 - DynamoDB state tracking for coordination
+- GitHub webhook support for speculative plans
 """
 
 import json
@@ -23,6 +24,7 @@ TASK_DEFINITION = os.environ['TASK_DEFINITION']
 SUBNETS = os.environ['SUBNETS'].split(',')
 SECURITY_GROUP = os.environ['SECURITY_GROUP']
 WEBHOOK_SECRET = os.environ['WEBHOOK_SECRET']
+GITHUB_WEBHOOK_SECRET = os.environ.get('GITHUB_WEBHOOK_SECRET', '')
 TABLE_NAME = os.environ['TABLE_NAME']
 MAX_AGENTS = int(os.environ.get('MAX_AGENTS', '3'))
 IDLE_TIMEOUT_MINUTES = int(os.environ.get('IDLE_TIMEOUT_MINUTES', '15'))
@@ -33,14 +35,29 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
 
 
-def verify_signature(payload: bytes, signature: str) -> bool:
-    """Verify TFC webhook HMAC signature."""
+def verify_tfc_signature(payload: bytes, signature: str) -> bool:
+    """Verify TFC webhook HMAC-SHA512 signature."""
     if not signature:
         return False
     expected = hmac.new(
         WEBHOOK_SECRET.encode(),
         payload,
         hashlib.sha512
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def verify_github_signature(payload: bytes, signature: str) -> bool:
+    """Verify GitHub webhook HMAC-SHA256 signature."""
+    if not signature or not GITHUB_WEBHOOK_SECRET:
+        return False
+    # GitHub signature format: sha256=<hex>
+    if not signature.startswith('sha256='):
+        return False
+    expected = 'sha256=' + hmac.new(
+        GITHUB_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(expected, signature)
 
@@ -153,6 +170,21 @@ def record_run_event(run_id: str, event_type: str, workspace: str):
     })
 
 
+def record_github_event(pr_number: int, action: str, repo: str):
+    """Record a GitHub PR event in DynamoDB for tracking."""
+    now = datetime.now(timezone.utc).isoformat()
+    table.put_item(Item={
+        'pk': f'GITHUB_PR#{repo}#{pr_number}',
+        'sk': f'EVENT#{action}#{now}',
+        'entity_type': 'github_event',
+        'pr_number': pr_number,
+        'action': action,
+        'repository': repo,
+        'timestamp': now,
+        'ttl': int(time.time()) + (7 * 24 * 60 * 60)  # 7 day TTL
+    })
+
+
 def update_agent_activity():
     """Update last_activity timestamp for all running agents."""
     agents = get_running_agents()
@@ -173,11 +205,11 @@ def should_scale_up(event_type: str) -> bool:
     active_agents = get_active_agent_count()
     
     # Always ensure at least one agent for work-producing events
-    if event_type in ['run:created', 'run:applying'] and active_agents == 0:
+    if event_type in ['run:created', 'run:applying', 'github:pull_request'] and active_agents == 0:
         return True
     
-    # For run:created, scale up if under max (new work coming)
-    if event_type == 'run:created' and active_agents < MAX_AGENTS:
+    # For run:created or github PR, scale up if under max (new work coming)
+    if event_type in ['run:created', 'github:pull_request'] and active_agents < MAX_AGENTS:
         # Simple heuristic: if we have pending work signals, add capacity
         # In practice, TFC agent pool handles job distribution
         return True
@@ -185,9 +217,9 @@ def should_scale_up(event_type: str) -> bool:
     return False
 
 
-def handle_webhook(event_type: str, run_id: str, workspace: str):
+def handle_tfc_webhook(event_type: str, run_id: str, workspace: str):
     """Handle incoming TFC webhook event."""
-    print(f"Handling {event_type} for run {run_id} in {workspace}")
+    print(f"Handling TFC {event_type} for run {run_id} in {workspace}")
     
     # Record the event
     record_run_event(run_id, event_type, workspace)
@@ -208,18 +240,47 @@ def handle_webhook(event_type: str, run_id: str, workspace: str):
         print(f"Run {run_id} finished with {event_type}")
 
 
+def handle_github_webhook(action: str, pr_number: int, repo: str, base_ref: str):
+    """Handle incoming GitHub pull_request webhook event."""
+    print(f"Handling GitHub PR #{pr_number} action={action} repo={repo} base={base_ref}")
+    
+    # Only trigger on PRs targeting main/master
+    if base_ref not in ['main', 'master']:
+        print(f"Ignoring PR targeting {base_ref} (not main/master)")
+        return
+    
+    # Only trigger on actions that indicate new work
+    # opened: new PR created
+    # synchronize: new commits pushed to PR
+    # reopened: PR was closed and reopened
+    if action not in ['opened', 'synchronize', 'reopened']:
+        print(f"Ignoring PR action {action}")
+        return
+    
+    # Record the event
+    record_github_event(pr_number, action, repo)
+    
+    # Update activity on existing agents
+    update_agent_activity()
+    
+    # Scale up for speculative plan
+    if should_scale_up('github:pull_request'):
+        start_agent()
+    else:
+        print(f"Sufficient agents running, not scaling up")
+
+
 def handler(event, context):
     """Lambda handler for API Gateway webhook."""
     print(f"Received event: {json.dumps(event)}")
     
-    # Extract payload and signature
+    # Extract payload and headers
     body = event.get('body', '')
     if event.get('isBase64Encoded'):
         import base64
         body = base64.b64decode(body).decode('utf-8')
     
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
-    signature = headers.get('x-tfe-notification-signature', '')
     
     # Parse payload first to check for verification request
     try:
@@ -231,48 +292,106 @@ def handler(event, context):
             'body': json.dumps({'error': 'Invalid JSON'})
         }
     
-    # Handle verification request BEFORE signature check
-    # TFC sends this when creating/updating notification configuration
+    # Determine webhook source by headers
+    tfc_signature = headers.get('x-tfe-notification-signature', '')
+    github_signature = headers.get('x-hub-signature-256', '')
+    github_event = headers.get('x-github-event', '')
+    
+    # Handle TFC verification request BEFORE signature check
     if payload.get('payload_version') == 1 and 'verification' in str(payload):
-        print("Verification request - responding OK")
+        print("TFC verification request - responding OK")
         return {
             'statusCode': 200,
             'body': json.dumps({'status': 'ok'})
         }
     
-    # Verify signature for all other requests
-    if not verify_signature(body.encode(), signature):
-        print("Invalid signature")
-        return {
-            'statusCode': 401,
-            'body': json.dumps({'error': 'Invalid signature'})
-        }
-    
-    # Extract run info
-    notifications = payload.get('notifications', [])
-    if not notifications:
-        print("No notifications in payload")
+    # Handle GitHub ping event (sent when webhook is created)
+    if github_event == 'ping':
+        print("GitHub ping event - responding OK")
         return {
             'statusCode': 200,
-            'body': json.dumps({'status': 'no notifications'})
+            'body': json.dumps({'status': 'ok', 'message': 'pong'})
         }
     
-    for notification in notifications:
-        run_id = notification.get('run_id', 'unknown')
-        event_type = notification.get('trigger', 'unknown')
-        workspace = notification.get('workspace_name', 'unknown')
+    # Route based on webhook source
+    if github_signature and github_event:
+        # GitHub webhook
+        if not verify_github_signature(body.encode(), github_signature):
+            print("Invalid GitHub signature")
+            return {
+                'statusCode': 401,
+                'body': json.dumps({'error': 'Invalid signature'})
+            }
+        
+        if github_event != 'pull_request':
+            print(f"Ignoring GitHub event type: {github_event}")
+            return {
+                'statusCode': 200,
+                'body': json.dumps({'status': 'ignored', 'event': github_event})
+            }
+        
+        # Extract PR info
+        action = payload.get('action', 'unknown')
+        pr = payload.get('pull_request', {})
+        pr_number = payload.get('number', 0)
+        repo = payload.get('repository', {}).get('full_name', 'unknown')
+        base_ref = pr.get('base', {}).get('ref', 'unknown')
         
         try:
-            handle_webhook(event_type, run_id, workspace)
+            handle_github_webhook(action, pr_number, repo, base_ref)
         except Exception as e:
-            print(f"Error handling webhook: {e}")
-            # Don't fail the whole request - TFC will retry
-            continue
+            print(f"Error handling GitHub webhook: {e}")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'status': 'ok',
+                'source': 'github',
+                'active_agents': get_active_agent_count()
+            })
+        }
     
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'status': 'ok',
-            'active_agents': get_active_agent_count()
-        })
-    }
+    elif tfc_signature:
+        # TFC webhook
+        if not verify_tfc_signature(body.encode(), tfc_signature):
+            print("Invalid TFC signature")
+            return {
+                'statusCode': 401,
+                'body': json.dumps({'error': 'Invalid signature'})
+            }
+        
+        # Extract run info
+        notifications = payload.get('notifications', [])
+        if not notifications:
+            print("No notifications in payload")
+            return {
+                'statusCode': 200,
+                'body': json.dumps({'status': 'no notifications'})
+            }
+        
+        for notification in notifications:
+            run_id = notification.get('run_id', 'unknown')
+            event_type = notification.get('trigger', 'unknown')
+            workspace = notification.get('workspace_name', 'unknown')
+            
+            try:
+                handle_tfc_webhook(event_type, run_id, workspace)
+            except Exception as e:
+                print(f"Error handling TFC webhook: {e}")
+                continue
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'status': 'ok',
+                'source': 'tfc',
+                'active_agents': get_active_agent_count()
+            })
+        }
+    
+    else:
+        print("Unknown webhook source - no valid signature header found")
+        return {
+            'statusCode': 401,
+            'body': json.dumps({'error': 'Unknown webhook source'})
+        }

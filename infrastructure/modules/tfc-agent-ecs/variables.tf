@@ -172,3 +172,19 @@ variable "log_retention_days" {
     error_message = "log_retention_days must be a valid CloudWatch Logs retention value"
   }
 }
+
+# =============================================================================
+# GitHub Webhook Configuration (for speculative plan support)
+# =============================================================================
+
+variable "enable_github_webhook" {
+  description = "Enable GitHub webhook to trigger agent scale-up on PRs (enables speculative plans)"
+  type        = bool
+  default     = false
+}
+
+variable "github_repository" {
+  description = "GitHub repository name (without owner) for webhook. Required if enable_github_webhook = true."
+  type        = string
+  default     = null
+}

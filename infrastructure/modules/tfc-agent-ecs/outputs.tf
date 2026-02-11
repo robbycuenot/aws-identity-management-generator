@@ -145,3 +145,17 @@ output "ecr_image" {
   description = "Full ECR image URI used by the ECS task"
   value       = local.ecr_image
 }
+
+# =============================================================================
+# GitHub Webhook
+# =============================================================================
+
+output "github_webhook_id" {
+  description = "ID of the GitHub webhook (if enabled)"
+  value       = var.enable_github_webhook ? github_repository_webhook.agent_trigger[0].id : null
+}
+
+output "github_webhook_url" {
+  description = "URL of the GitHub webhook (if enabled)"
+  value       = var.enable_github_webhook ? github_repository_webhook.agent_trigger[0].url : null
+}

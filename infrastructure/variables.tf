@@ -204,3 +204,9 @@ variable "docker_hub_access_token" {
   default     = null
   sensitive   = true
 }
+
+variable "enable_tfc_agent_github_webhook" {
+  description = "Enable GitHub webhook to trigger agent scale-up on PRs (enables speculative plans with ECS agents)"
+  type        = bool
+  default     = false
+}

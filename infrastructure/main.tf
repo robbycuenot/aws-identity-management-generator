@@ -86,8 +86,9 @@ module "tfc_single_state" {
   create_aws_github_oidc_provider = var.create_aws_github_oidc_provider
 
   # TFC Agent configuration (optional)
-  use_agent_execution = var.enable_tfc_agent_ecs
-  agent_pool_id       = var.enable_tfc_agent_ecs ? module.tfc_agent_ecs[0].agent_pool_id : null
+  use_agent_execution      = var.enable_tfc_agent_ecs
+  agent_pool_id            = var.enable_tfc_agent_ecs ? module.tfc_agent_ecs[0].agent_pool_id : null
+  enable_speculative_plans = var.enable_tfc_agent_ecs ? var.enable_tfc_agent_github_webhook : null
 }
 
 # =============================================================================
@@ -128,8 +129,9 @@ module "tfc_agent_ecs" {
   source = "./modules/tfc-agent-ecs"
 
   providers = {
-    aws = aws.identity_center
-    tfe = tfe
+    aws    = aws.identity_center
+    tfe    = tfe
+    github = github
   }
 
   aws_region       = var.aws_region
@@ -148,6 +150,10 @@ module "tfc_agent_ecs" {
   # Docker Hub credentials for ECR pull-through cache
   docker_hub_username     = var.docker_hub_username
   docker_hub_access_token = var.docker_hub_access_token
+
+  # GitHub webhook for speculative plan support
+  enable_github_webhook = var.enable_tfc_agent_github_webhook
+  github_repository     = var.enable_tfc_agent_github_webhook ? var.github_repo : null
 
   tags = {
     Environment = var.environment
