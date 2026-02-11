@@ -83,10 +83,14 @@ resource "tfe_workspace" "identity_store" {
 
 # Identity Store Workspace Settings
 # Configures execution mode and remote state sharing
+# Shares state with account_assignments (for user/group IDs) and team (for users_map/groups_map)
 resource "tfe_workspace_settings" "identity_store" {
-  workspace_id              = tfe_workspace.identity_store.id
-  execution_mode            = "remote"
-  remote_state_consumer_ids = [tfe_workspace.account_assignments.id]
+  workspace_id   = tfe_workspace.identity_store.id
+  execution_mode = "remote"
+  remote_state_consumer_ids = concat(
+    [tfe_workspace.account_assignments.id],
+    var.enable_team ? [tfe_workspace.team[0].id] : []
+  )
 }
 
 # Managed Policies Workspace
@@ -158,10 +162,14 @@ resource "tfe_workspace" "permission_sets" {
 
 # Permission Sets Workspace Settings
 # Configures execution mode and remote state sharing
+# Shares state with account_assignments (for permission set ARNs) and team (for permission_sets_map)
 resource "tfe_workspace_settings" "permission_sets" {
-  workspace_id              = tfe_workspace.permission_sets.id
-  execution_mode            = "remote"
-  remote_state_consumer_ids = [tfe_workspace.account_assignments.id]
+  workspace_id   = tfe_workspace.permission_sets.id
+  execution_mode = "remote"
+  remote_state_consumer_ids = concat(
+    [tfe_workspace.account_assignments.id],
+    var.enable_team ? [tfe_workspace.team[0].id] : []
+  )
 }
 
 # Account Assignments Workspace
