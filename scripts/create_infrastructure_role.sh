@@ -243,7 +243,9 @@ PERMISSIONS_POLICY=$(cat <<EOF
                 "secretsmanager:UpdateSecret",
                 "secretsmanager:TagResource",
                 "secretsmanager:UntagResource",
-                "secretsmanager:GetResourcePolicy"
+                "secretsmanager:GetResourcePolicy",
+                "secretsmanager:PutResourcePolicy",
+                "secretsmanager:DeleteResourcePolicy"
             ],
             "Resource": [
                 "arn:aws:secretsmanager:*:${ACCOUNT_ID}:secret:*-tfc-agent-*",

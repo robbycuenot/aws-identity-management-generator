@@ -44,6 +44,32 @@ resource "aws_secretsmanager_secret_version" "docker_hub_credentials" {
   })
 }
 
+# Resource policy to allow ECR pull-through cache service-linked role to access the secret
+resource "aws_secretsmanager_secret_policy" "docker_hub_credentials" {
+  count      = var.docker_hub_username != null ? 1 : 0
+  secret_arn = aws_secretsmanager_secret.docker_hub_credentials[0].arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowECRPullThroughCache"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecr.amazonaws.com"
+        }
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "aws:sourceAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
 resource "aws_ecr_pull_through_cache_rule" "docker_hub" {
   ecr_repository_prefix = var.ecr_pull_through_cache_prefix
   upstream_registry_url = "registry-1.docker.io"
