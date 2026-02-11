@@ -96,7 +96,7 @@ Set these variables in your TFC workspace:
 |----------|------|-----------|-------------|---------|
 | `enable_tfc_agent_ecs` | terraform | no | Enable TFC agent on ECS Fargate (single-state mode only) | `false` |
 | `tfc_agent_name` | terraform | no | Name for the TFC agent (appears in TFC UI) | `ecs-agent` |
-| `tfc_agent_tasks_per_run` | terraform | no | Number of ECS tasks to start per run (2 = one for plan, one for apply) | `2` |
+| `tfc_agent_tasks_per_run` | terraform | no | Number of ECS tasks to start per webhook event | `1` |
 | `tfc_agent_vpc_id` | terraform | no | VPC ID (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `tfc_agent_subnet_ids` | terraform | no | Private subnet IDs with NAT (required if `enable_tfc_agent_ecs = true`) | `null` |
 | `docker_hub_username` | terraform | no | Docker Hub username (required if `enable_tfc_agent_ecs = true`) | `null` |

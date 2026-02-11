@@ -169,9 +169,9 @@ variable "tfc_agent_name" {
 }
 
 variable "tfc_agent_tasks_per_run" {
-  description = "Number of ECS tasks to start per TFC run (2 recommended: one for plan, one for apply)"
+  description = "Number of ECS tasks to start per TFC webhook event. Default is 1 since run:needs_attention triggers on apply approval."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "tfc_agent_vpc_id" {
