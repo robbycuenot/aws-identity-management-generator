@@ -35,6 +35,8 @@ locals {
     sso_instance = local.sso_instance
     table = data.aws_dynamodb_table.eligibility_table
     permission_sets_map = var.permission_sets_map
+    users_map           = var.users_map
+    groups_map          = var.groups_map
   }
 
   approver_environment_data = {

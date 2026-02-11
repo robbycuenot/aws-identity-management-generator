@@ -37,6 +37,8 @@ variable "environment_data" {
       hash_key = string
     })
     permission_sets_map = map(string)
+    users_map           = map(string)
+    groups_map          = map(string)
   })
 }
 

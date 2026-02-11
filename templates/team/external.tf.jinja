@@ -1,7 +1,12 @@
 # External data sources for multi-state TFC mode
-# Fetches permission_sets_map from the permission_sets workspace
+# Fetches identity maps from other workspaces to avoid redundant API calls
 
 data "tfe_outputs" "permission_sets" {
   organization = "{{ tfe_organization }}"
   workspace = "{{ workspace_permission_sets }}"
+}
+
+data "tfe_outputs" "identity_store" {
+  organization = "{{ tfe_organization }}"
+  workspace = "{{ workspace_identity_store }}"
 }

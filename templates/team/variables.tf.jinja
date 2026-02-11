@@ -6,3 +6,15 @@ variable "permission_sets_map" {
   type        = map(string)
   default     = {}
 }
+
+variable "users_map" {
+  description = "Map of user names to their Identity Store user IDs (passed from identity_store module)"
+  type        = map(string)
+  default     = {}
+}
+
+variable "groups_map" {
+  description = "Map of group names to their Identity Store group IDs (passed from identity_store module)"
+  type        = map(string)
+  default     = {}
+}

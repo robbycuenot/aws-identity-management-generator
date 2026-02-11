@@ -29,7 +29,9 @@ module "account_assignments" {
 module "team" {
   source = "./team"
 
-  # Pass permission sets map to avoid redundant API calls in eligibility modules
+  # Pass identity maps to avoid redundant API calls in eligibility modules
   permission_sets_map = module.permission_sets.permission_sets_map
+  users_map           = module.identity_store.users_map
+  groups_map          = module.identity_store.groups_map
 }
 {% endif %}
