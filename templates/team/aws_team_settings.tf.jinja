@@ -1,5 +1,5 @@
 module "settings" {
-  source = "../settings_module"
+  source = "./settings"
 
   table            = data.aws_dynamodb_table.settings_table
   modified_by_user = var.MODIFIED_BY_USER

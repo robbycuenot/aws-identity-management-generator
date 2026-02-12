@@ -2,7 +2,8 @@
   The template below loops over the provided DynamoDB tables.
   For any table whose name matches the Approvers pattern, it outputs
   a data block for the approvers table; for any table matching the Eligibility
-  pattern, it outputs a data block for the eligibility table.
+  pattern, it outputs a data block for the eligibility table; for any table
+  matching the Settings pattern, it outputs a data block for the settings table.
 #}
 
 {% for table in dynamodb_tables %}
@@ -12,6 +13,10 @@ data "aws_dynamodb_table" "approvers_table" {
 }
   {% elif table.Table.TableName.startswith("Eligibility-") and table.Table.TableName.endswith("-main") %}
 data "aws_dynamodb_table" "eligibility_table" {
+  name = "{{ table.Table.TableName }}"
+}
+  {% elif table.Table.TableName.startswith("Settings-") and table.Table.TableName.endswith("-main") %}
+data "aws_dynamodb_table" "settings_table" {
   name = "{{ table.Table.TableName }}"
 }
   {% endif %}

@@ -1221,7 +1221,7 @@ def render_team_application_assignments(ctx: GeneratorContext):
 
 
 def render_team_settings(ctx: GeneratorContext):
-    """Generate the settings module and environment-specific settings invocations."""
+    """Generate the settings module and aws_team_settings.tf file."""
     ctx.log("[GENERATE] Rendering TEAM settings...")
 
     # Check if settings data exists
@@ -1248,15 +1248,10 @@ def render_team_settings(ctx: GeneratorContext):
     team_admin_group = settings_data.get("teamAdminGroup", "")
     team_auditor_group = settings_data.get("teamAuditorGroup", "")
 
-    # Get AWS region
-    region = read_sso_admin_region(ctx)
-
-    # Prepare template data
+    # Prepare template data for aws_team_settings.tf.jinja
     template_data = {
-        'settings_table_name': settings_table_name,
         'team_admin_group': team_admin_group,
         'team_auditor_group': team_auditor_group,
-        'aws_region': region,
         'require_approvals': settings_data.get("approval", True),
         'require_comments': settings_data.get("comments", True),
         'require_ticket_number': settings_data.get("ticketNo", False),
@@ -1270,39 +1265,35 @@ def render_team_settings(ctx: GeneratorContext):
         'sns_notifications_enabled': settings_data.get("snsNotificationsEnabled", False),
     }
 
-    # Copy the settings_module templates to team/settings_module
-    settings_module_src = Path(TEMPLATE_DIR) / "team" / "settings_module"
-    settings_module_dest = Path(ctx.terraform_dir) / "team" / "settings_module"
+    # Copy the settings module to team/settings/
+    settings_module_src = Path(TEMPLATE_DIR) / "team" / "settings"
+    settings_module_dest = Path(ctx.terraform_dir) / "team" / "settings"
 
     if settings_module_src.exists():
         settings_module_dest.mkdir(parents=True, exist_ok=True)
         for tf_file in settings_module_src.glob("*.tf"):
             dest_file = settings_module_dest / tf_file.name
             shutil.copy2(tf_file, dest_file)
-            ctx.log(f"[VERBOSE-2] Copied {tf_file.name} to settings_module", 2)
+            ctx.log(f"[VERBOSE-2] Copied {tf_file.name} to team/settings/", 2)
 
-    # Render environment-specific settings files
-    settings_template_dir = Path(TEMPLATE_DIR) / "team" / "settings"
-    settings_output_dir = Path(ctx.terraform_dir) / "team" / "settings"
-    settings_output_dir.mkdir(parents=True, exist_ok=True)
+    # Render aws_team_settings.tf to the team folder
+    team_template_dir = Path(TEMPLATE_DIR) / "team"
+    team_output_dir = Path(ctx.terraform_dir) / "team"
 
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(settings_template_dir),
+        loader=jinja2.FileSystemLoader(team_template_dir),
         autoescape=False,
         trim_blocks=True,
         lstrip_blocks=True,
     )
 
-    for template_file in settings_template_dir.glob("*.jinja"):
-        template = env.get_template(template_file.name)
-        rendered = template.render(**template_data).rstrip() + "\n"
+    template = env.get_template("aws_team_settings.tf.jinja")
+    rendered = template.render(**template_data).rstrip() + "\n"
 
-        output_filename = template_file.name.replace(".jinja", "")
-        output_file = settings_output_dir / output_filename
-        output_file.write_text(rendered, encoding="utf-8")
+    output_file = team_output_dir / "aws_team_settings.tf"
+    output_file.write_text(rendered, encoding="utf-8")
 
-        ctx.log(f"[VERBOSE-2] Rendered {output_filename} for settings", 2)
-
+    ctx.log(f"[VERBOSE-2] Rendered aws_team_settings.tf", 2)
     ctx.log("[GENERATE] Rendered TEAM settings")
 
 

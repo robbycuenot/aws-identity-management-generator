@@ -18,3 +18,9 @@ variable "groups_map" {
   type        = map(string)
   default     = {}
 }
+
+variable "MODIFIED_BY_USER" {
+  description = "User identifier for tracking who modified settings (used by settings module)"
+  type        = string
+  default     = "terraform"
+}
