@@ -1,0 +1,25 @@
+module "settings" {
+  source = "../settings_module"
+
+  table            = data.aws_dynamodb_table.settings_table
+  modified_by_user = var.MODIFIED_BY_USER
+
+  require_approvals     = {{ require_approvals | lower }}
+  require_comments      = {{ require_comments | lower }}
+  require_ticket_number = {{ require_ticket_number | lower }}
+
+  request_expiration_time_hours  = {{ request_expiration_time_hours }}
+  request_maximum_duration_hours = {{ request_maximum_duration_hours }}
+
+  ses_notifications_enabled = {{ ses_notifications_enabled | lower }}
+{% if ses_source_arn %}  ses_source_arn            = "{{ ses_source_arn }}"
+{% endif %}{% if ses_source_email %}  ses_source_email          = "{{ ses_source_email }}"
+{% endif %}
+  slack_notifications_enabled = {{ slack_notifications_enabled | lower }}
+{% if slack_token %}  slack_token                 = "{{ slack_token }}"
+{% endif %}
+  sns_notifications_enabled = {{ sns_notifications_enabled | lower }}
+
+  team_admin_group   = "{{ team_admin_group }}"
+  team_auditor_group = "{{ team_auditor_group }}"
+}

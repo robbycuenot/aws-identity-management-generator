@@ -1220,6 +1220,92 @@ def render_team_application_assignments(ctx: GeneratorContext):
     ctx.log(f"[GENERATE] Rendered TEAM application assignments: {len(users)} users, {len(groups)} groups")
 
 
+def render_team_settings(ctx: GeneratorContext):
+    """Generate the settings module and environment-specific settings invocations."""
+    ctx.log("[GENERATE] Rendering TEAM settings...")
+
+    # Check if settings data exists
+    settings_file = Path(ctx.json_dir) / "team" / "dynamodb_items" / "settings" / "settings.json"
+    if not settings_file.exists():
+        ctx.log("[GENERATE] No settings data found, skipping settings generation")
+        return
+
+    # Load settings data
+    try:
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            settings_data = json.load(f)
+    except Exception as e:
+        ctx.log(f"[GENERATE] Error loading settings data: {e}")
+        return
+
+    # Extract settings table name
+    settings_table_name = settings_data.get("TableName", "")
+    if not settings_table_name:
+        ctx.log("[GENERATE] No table name found in settings data")
+        return
+
+    # Load team admin and auditor groups from the settings data
+    team_admin_group = settings_data.get("teamAdminGroup", "")
+    team_auditor_group = settings_data.get("teamAuditorGroup", "")
+
+    # Get AWS region
+    region = read_sso_admin_region(ctx)
+
+    # Prepare template data
+    template_data = {
+        'settings_table_name': settings_table_name,
+        'team_admin_group': team_admin_group,
+        'team_auditor_group': team_auditor_group,
+        'aws_region': region,
+        'require_approvals': settings_data.get("approval", True),
+        'require_comments': settings_data.get("comments", True),
+        'require_ticket_number': settings_data.get("ticketNo", False),
+        'request_maximum_duration_hours': int(settings_data.get("duration", "8")),
+        'request_expiration_time_hours': int(settings_data.get("expiry", "8")),
+        'ses_notifications_enabled': settings_data.get("sesNotificationsEnabled", False),
+        'ses_source_arn': settings_data.get("sesSourceArn", ""),
+        'ses_source_email': settings_data.get("sesSourceEmail", ""),
+        'slack_notifications_enabled': settings_data.get("slackNotificationsEnabled", False),
+        'slack_token': settings_data.get("slackToken", ""),
+        'sns_notifications_enabled': settings_data.get("snsNotificationsEnabled", False),
+    }
+
+    # Copy the settings_module templates to team/settings_module
+    settings_module_src = Path(TEMPLATE_DIR) / "team" / "settings_module"
+    settings_module_dest = Path(ctx.terraform_dir) / "team" / "settings_module"
+
+    if settings_module_src.exists():
+        settings_module_dest.mkdir(parents=True, exist_ok=True)
+        for tf_file in settings_module_src.glob("*.tf"):
+            dest_file = settings_module_dest / tf_file.name
+            shutil.copy2(tf_file, dest_file)
+            ctx.log(f"[VERBOSE-2] Copied {tf_file.name} to settings_module", 2)
+
+    # Render environment-specific settings files
+    settings_template_dir = Path(TEMPLATE_DIR) / "team" / "settings"
+    settings_output_dir = Path(ctx.terraform_dir) / "team" / "settings"
+    settings_output_dir.mkdir(parents=True, exist_ok=True)
+
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(settings_template_dir),
+        autoescape=False,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    for template_file in settings_template_dir.glob("*.jinja"):
+        template = env.get_template(template_file.name)
+        rendered = template.render(**template_data).rstrip() + "\n"
+
+        output_filename = template_file.name.replace(".jinja", "")
+        output_file = settings_output_dir / output_filename
+        output_file.write_text(rendered, encoding="utf-8")
+
+        ctx.log(f"[VERBOSE-2] Rendered {output_filename} for settings", 2)
+
+    ctx.log("[GENERATE] Rendered TEAM settings")
+
+
 def add_module_prefix_to_imports(data, module_name: str, data_key: str):
     """
     Adds module prefix to ImportTo fields for single-state mode.
@@ -1689,6 +1775,7 @@ def generate_terraform(verbosity=0, output=".", config="config.yaml", overrides=
         render_team_locals_tf(ctx)
         render_team_data_tf(ctx)
         render_team_application_assignments(ctx)
+        render_team_settings(ctx)
     else:
         ctx.log("[GENERATE] Skipping TEAM files (enable_team is False)")
     

@@ -894,6 +894,125 @@ def fetch_dynamodb_tables(verbosity=0):
 
 
 # ------------------------------------------------------------------------
+# DynamoDB Tables - Settings
+# ------------------------------------------------------------------------
+def fetch_settings_table(verbosity=0):
+    """
+    Fetches the DynamoDB Settings table (Settings-*-main) with tags
+    project=iam-identity-center-team and environment=prod.
+
+    Stores the table metadata and the settings item (id='settings') to JSON files.
+    """
+    if verbosity >= 1:
+        print("[FETCH] Fetching Settings DynamoDB table for IAM Identity Center team...")
+
+    dynamodb_client = boto3.client("dynamodb")
+
+    # Retrieve all table names (with pagination)
+    table_names = []
+    last_evaluated = None
+    while True:
+        if last_evaluated:
+            response = dynamodb_client.list_tables(ExclusiveStartTableName=last_evaluated)
+        else:
+            response = dynamodb_client.list_tables()
+        table_names.extend(response.get("TableNames", []))
+        last_evaluated = response.get("LastEvaluatedTableName")
+        if not last_evaluated:
+            break
+
+    # Define the name pattern for Settings table
+    settings_pattern = re.compile(r"^Settings-.*-main$")
+
+    # Create the team folder subdirectories
+    metadata_dir = Path(JSON_DIR) / "team" / "dynamodb_tables"
+    items_dir = Path(JSON_DIR) / "team" / "dynamodb_items" / "settings"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    items_dir.mkdir(parents=True, exist_ok=True)
+
+    # Import the deserializer
+    from boto3.dynamodb.types import TypeDeserializer  # type: ignore
+    deserializer = TypeDeserializer()
+
+    for table_name in table_names:
+        if settings_pattern.match(table_name):
+            try:
+                desc = dynamodb_client.describe_table(TableName=table_name)
+            except Exception as e:
+                if verbosity >= 1:
+                    print(f"[FETCH] Error describing table {table_name}: {e}")
+                continue
+
+            table_arn = desc["Table"]["TableArn"]
+
+            try:
+                tags_resp = dynamodb_client.list_tags_of_resource(ResourceArn=table_arn)
+                tags = tags_resp.get("Tags", [])
+            except Exception as e:
+                if verbosity >= 1:
+                    print(f"[FETCH] Error getting tags for table {table_name}: {e}")
+                tags = []
+
+            has_project_tag = any(t.get("Key") == "project" and t.get("Value") == "iam-identity-center-team" for t in tags)
+            has_env_tag = any(t.get("Key") == "environment" and t.get("Value") == "prod" for t in tags)
+
+            if not (has_project_tag and has_env_tag):
+                if verbosity >= 2:
+                    print(f"[FETCH] Table {table_name} does not have required tags.")
+                continue
+
+            if verbosity >= 1:
+                print(f"[FETCH] Found Settings table: {table_name}")
+
+            # Write the table metadata
+            sanitized_table_name = sanitize_name(table_name)
+            metadata_filepath = metadata_dir / f"{sanitized_table_name}.json"
+            metadata = {
+                "Table": desc["Table"],
+                "Tags": tags
+            }
+            with open(metadata_filepath, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False, default=str)
+
+            if verbosity >= 1:
+                print(f"[FETCH] Wrote metadata for Settings table to {metadata_filepath}")
+
+            # Fetch the settings item (id='settings')
+            try:
+                get_item_resp = dynamodb_client.get_item(
+                    TableName=table_name,
+                    Key={"id": {"S": "settings"}}
+                )
+
+                if "Item" in get_item_resp:
+                    # Deserialize the item
+                    raw_item = get_item_resp["Item"]
+                    settings_item = {k: deserializer.deserialize(v) for k, v in raw_item.items()}
+
+                    # Add metadata
+                    settings_item["TableName"] = table_name
+                    settings_item["TableArn"] = table_arn
+
+                    # Write to file
+                    settings_filepath = items_dir / "settings.json"
+                    with open(settings_filepath, "w", encoding="utf-8") as f:
+                        json.dump(settings_item, f, indent=2, ensure_ascii=False, default=str)
+
+                    if verbosity >= 1:
+                        print(f"[FETCH] Wrote settings item to {settings_filepath}")
+                else:
+                    if verbosity >= 1:
+                        print(f"[FETCH] No settings item found in table {table_name}")
+
+            except Exception as e:
+                if verbosity >= 1:
+                    print(f"[FETCH] Error fetching settings item from {table_name}: {e}")
+
+            # Only process the first matching Settings table
+            break
+
+
+# ------------------------------------------------------------------------
 # TEAM Application
 # ------------------------------------------------------------------------
 def fetch_team_application(sso_admin, instance_arn, identity_store, identity_store_id, verbosity=0):
@@ -1079,6 +1198,7 @@ def fetch_data(verbosity=0, retain_managed_policies=False, output=".", config="c
     cfg = get_config(config, overrides)
     if cfg.is_team_enabled():
         fetch_dynamodb_tables(verbosity)
+        fetch_settings_table(verbosity)
         fetch_team_application(sso_admin, instance_arn, identity_store, identity_store_id, verbosity)
     elif verbosity >= 1:
         print("[FETCH] Skipping TEAM data (enable_team is False)")

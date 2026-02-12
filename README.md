@@ -294,6 +294,27 @@ curl -sL https://raw.githubusercontent.com/robbycuenot/aws-identity-management-g
 
 [AWS TEAM (Temporary Elevated Access Management)](https://aws-samples.github.io/iam-identity-center-team/) provides just-in-time, approval-based temporary access. Enable with `-m true` or `ENABLE_TEAM=true`.
 
+The generator supports three TEAM components:
+
+| Component | Description | Import Support |
+|-----------|-------------|----------------|
+| **Eligibility Policies** | Who can request which permission sets | ❌ Manual migration required |
+| **Approver Policies** | Who can approve requests | ❌ Manual migration required |
+| **Settings** | Global TEAM configuration | ✅ Fully generated |
+
+#### TEAM Settings
+
+When TEAM is enabled, the generator fetches the Settings table and generates Terraform code to manage:
+
+- Approval requirements (approvals, comments, ticket numbers)
+- Request duration and expiration limits
+- Notification settings (SES, Slack, SNS)
+- Admin and auditor group assignments
+
+The settings are generated in `team/settings/` with a reusable `settings_module/` that manages the DynamoDB item.
+
+#### Eligibility and Approver Migration
+
 ⚠️ **Import limitation:** TEAM eligibility and approver policies are stored in DynamoDB and cannot be imported into Terraform. For existing TEAM deployments:
 
 1. Run the generator with `-m true` to create Terraform code
@@ -329,7 +350,11 @@ output/
 ├── managed_policies/
 ├── permission_sets/
 ├── account_assignments/
-└── team/                # if enabled
+└── team/                    # if enabled
+    ├── eligibility/
+    ├── approvers/
+    ├── settings/            # TEAM global settings
+    └── settings_module/     # reusable settings module
 ```
 
 ### Multi-State Mode
@@ -340,6 +365,10 @@ output/
 ├── permission_sets/     # Depends on above
 ├── account_assignments/ # Depends on above
 └── team/                # if enabled
+    ├── eligibility/
+    ├── approvers/
+    ├── settings/
+    └── settings_module/
 ```
 
 Apply order: `identity_store` & `managed_policies` → `permission_sets` → `account_assignments` → `team`
