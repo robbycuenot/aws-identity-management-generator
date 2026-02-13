@@ -204,14 +204,17 @@ def should_scale_up(event_type: str) -> bool:
     """Determine if we should start a new agent based on current state."""
     active_agents = get_active_agent_count()
     
+    # Events that indicate work needs an agent
+    work_events = ['run:created', 'run:planning', 'run:applying', 'github:pull_request']
+    
     # Always ensure at least one agent for work-producing events
-    if event_type in ['run:created', 'run:applying', 'github:pull_request'] and active_agents == 0:
+    if event_type in work_events and active_agents == 0:
         return True
     
-    # For run:created or github PR, scale up if under max (new work coming)
-    if event_type in ['run:created', 'github:pull_request'] and active_agents < MAX_AGENTS:
-        # Simple heuristic: if we have pending work signals, add capacity
-        # In practice, TFC agent pool handles job distribution
+    # For new work signals, scale up if under max
+    # run:applying is included because a confirmed apply after a long idle gap
+    # (e.g. 2 hours) means all agents were stopped by the idle checker
+    if event_type in ['run:created', 'run:planning', 'run:applying', 'github:pull_request'] and active_agents < MAX_AGENTS:
         return True
     
     return False
@@ -227,7 +230,7 @@ def handle_tfc_webhook(event_type: str, run_id: str, workspace: str):
     # Update activity on existing agents (keeps them alive)
     update_agent_activity()
     
-    if event_type in ['run:created', 'run:applying', 'run:needs_attention']:
+    if event_type in ['run:created', 'run:planning', 'run:applying', 'run:needs_attention']:
         # These events indicate work - ensure we have agents
         if should_scale_up(event_type):
             start_agent()
@@ -360,19 +363,21 @@ def handler(event, context):
                 'body': json.dumps({'error': 'Invalid signature'})
             }
         
-        # Extract run info
+        # Extract run info - run_id and workspace_name are top-level fields,
+        # while trigger is inside each notification object
+        run_id = payload.get('run_id', 'unknown')
+        workspace = payload.get('workspace_name', 'unknown')
+        
         notifications = payload.get('notifications', [])
         if not notifications:
-            print("No notifications in payload")
+            print(f"No notifications in payload for run {run_id} in {workspace}")
             return {
                 'statusCode': 200,
                 'body': json.dumps({'status': 'no notifications'})
             }
         
         for notification in notifications:
-            run_id = notification.get('run_id', 'unknown')
             event_type = notification.get('trigger', 'unknown')
-            workspace = notification.get('workspace_name', 'unknown')
             
             try:
                 handle_tfc_webhook(event_type, run_id, workspace)

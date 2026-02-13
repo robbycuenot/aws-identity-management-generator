@@ -183,7 +183,7 @@ resource "tfe_notification_configuration" "tfc_agent_webhook" {
   name             = "${var.prefix}-${var.environment}-agent-launcher"
   enabled          = true
   destination_type = "generic"
-  triggers         = ["run:created", "run:needs_attention", "run:applying"]
+  triggers         = ["run:created", "run:planning", "run:needs_attention", "run:applying"]
   url              = module.tfc_agent_ecs[0].webhook_url
   token            = module.tfc_agent_ecs[0].webhook_secret
 
