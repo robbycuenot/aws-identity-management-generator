@@ -140,8 +140,9 @@ module "tfc_agent_ecs" {
   tfc_agent_name   = var.tfc_agent_name
 
   # Lifecycle manager configuration
-  max_agents           = var.tfc_agent_max_agents
-  idle_timeout_minutes = var.tfc_agent_idle_timeout_minutes
+  max_agents                = var.tfc_agent_max_agents
+  idle_timeout_minutes      = var.tfc_agent_idle_timeout_minutes
+  enable_agent_status_check = var.tfc_agent_enable_status_check
 
   # VPC configuration
   vpc_id     = var.tfc_agent_vpc_id
@@ -189,4 +190,29 @@ resource "tfe_notification_configuration" "tfc_agent_webhook" {
 
   # Ensure webhook endpoint is fully deployed before TFC tries to verify it
   depends_on = [time_sleep.wait_for_webhook]
+}
+
+# TFC sends no notification when an apply is confirmed, so a pre-apply run task
+# wakes an agent if the idle checker has stopped them all since the plan.
+resource "tfe_organization_run_task" "tfc_agent_launcher" {
+  count = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
+
+  organization = var.tfc_organization_name
+  name         = "${var.prefix}-${var.environment}-agent-launcher"
+  description  = "Starts a TFC agent on ECS when an apply is confirmed"
+  url          = module.tfc_agent_ecs[0].webhook_url
+  hmac_key     = module.tfc_agent_ecs[0].run_task_hmac_key
+  enabled      = true
+
+  # TFC sends a test request on creation that the Lambda must answer
+  depends_on = [time_sleep.wait_for_webhook]
+}
+
+resource "tfe_workspace_run_task" "tfc_agent_launcher" {
+  count = var.enable_tfc_agent_ecs && var.deployment_mode == "tfc-single-state" ? 1 : 0
+
+  workspace_id      = module.tfc_single_state[0].workspace_id
+  task_id           = tfe_organization_run_task.tfc_agent_launcher[0].id
+  enforcement_level = "advisory"
+  stages            = ["pre_apply"]
 }

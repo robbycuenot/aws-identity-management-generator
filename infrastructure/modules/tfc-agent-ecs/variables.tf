@@ -123,6 +123,12 @@ variable "idle_timeout_minutes" {
   default     = 15
 }
 
+variable "enable_agent_status_check" {
+  description = "Create a TFC team token (manage agent pools) so the idle checker never stops an agent TFC reports as busy. Requires a TFE token that can manage teams."
+  type        = bool
+  default     = true
+}
+
 variable "cpu" {
   description = "CPU units for the Fargate task (max: 16384 = 16 vCPU)"
   type        = number

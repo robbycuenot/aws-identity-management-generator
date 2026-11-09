@@ -7,6 +7,7 @@ Manages ECS Fargate agents for Terraform Cloud runs with:
 - Auto-shutdown after idle timeout
 - DynamoDB state tracking for coordination
 - GitHub webhook support for speculative plans
+- Pre-apply run task support for confirmed applies
 """
 
 import json
@@ -14,9 +15,11 @@ import os
 import time
 import hmac
 import hashlib
+import uuid
+import urllib.request
+import urllib.error
 import boto3
 from datetime import datetime, timezone
-from decimal import Decimal
 
 # Environment variables
 CLUSTER_ARN = os.environ['CLUSTER_ARN']
@@ -25,14 +28,22 @@ SUBNETS = os.environ['SUBNETS'].split(',')
 SECURITY_GROUP = os.environ['SECURITY_GROUP']
 WEBHOOK_SECRET = os.environ['WEBHOOK_SECRET']
 GITHUB_WEBHOOK_SECRET = os.environ.get('GITHUB_WEBHOOK_SECRET', '')
+RUN_TASK_HMAC_KEY = os.environ.get('RUN_TASK_HMAC_KEY', '')
 TABLE_NAME = os.environ['TABLE_NAME']
 MAX_AGENTS = int(os.environ.get('MAX_AGENTS', '3'))
 IDLE_TIMEOUT_MINUTES = int(os.environ.get('IDLE_TIMEOUT_MINUTES', '15'))
+AGENT_NAME_PREFIX = os.environ.get('AGENT_NAME_PREFIX', 'ecs-agent')
+TFC_ADDRESS = os.environ.get('TFC_ADDRESS', 'app.terraform.io')
 
 # AWS clients
 ecs = boto3.client('ecs')
+lambda_client = boto3.client('lambda')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
+
+
+def http_response(status_code: int, body: dict) -> dict:
+    return {'statusCode': status_code, 'body': json.dumps(body)}
 
 
 def verify_tfc_signature(payload: bytes, signature: str) -> bool:
@@ -41,6 +52,18 @@ def verify_tfc_signature(payload: bytes, signature: str) -> bool:
         return False
     expected = hmac.new(
         WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha512
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def verify_run_task_signature(payload: bytes, signature: str) -> bool:
+    """Verify TFC run task HMAC-SHA512 signature."""
+    if not signature or not RUN_TASK_HMAC_KEY:
+        return False
+    expected = hmac.new(
+        RUN_TASK_HMAC_KEY.encode(),
         payload,
         hashlib.sha512
     ).hexdigest()
@@ -116,7 +139,9 @@ def get_active_agent_count() -> int:
 
 def start_agent() -> str:
     """Start a new ECS Fargate agent task."""
-    response = ecs.run_task(
+    # Unique name lets the idle checker match this task to its TFC agent status
+    agent_name = f"{AGENT_NAME_PREFIX}-{uuid.uuid4().hex[:8]}"
+    run_response = ecs.run_task(
         cluster=CLUSTER_ARN,
         taskDefinition=TASK_DEFINITION,
         launchType='FARGATE',
@@ -127,11 +152,17 @@ def start_agent() -> str:
                 'assignPublicIp': 'DISABLED'
             }
         },
+        overrides={
+            'containerOverrides': [{
+                'name': 'tfc-agent',
+                'environment': [{'name': 'TFC_AGENT_NAME', 'value': agent_name}]
+            }]
+        },
         count=1
     )
     
-    if response['tasks']:
-        task_arn = response['tasks'][0]['taskArn']
+    if run_response['tasks']:
+        task_arn = run_response['tasks'][0]['taskArn']
         task_id = task_arn.split('/')[-1]
         
         # Record in DynamoDB
@@ -141,16 +172,17 @@ def start_agent() -> str:
             'sk': 'METADATA',
             'entity_type': 'agent',
             'task_arn': task_arn,
+            'agent_name': agent_name,
             'status': 'running',
             'started_at': now,
             'last_activity': now,
             'ttl': int(time.time()) + (24 * 60 * 60)  # 24 hour TTL for cleanup
         })
         
-        print(f"Started agent: {task_arn}")
+        print(f"Started agent: {task_arn} ({agent_name})")
         return task_arn
     else:
-        failures = response.get('failures', [])
+        failures = run_response.get('failures', [])
         print(f"Failed to start agent: {failures}")
         raise Exception(f"Failed to start ECS task: {failures}")
 
@@ -212,8 +244,6 @@ def should_scale_up(event_type: str) -> bool:
         return True
     
     # For new work signals, scale up if under max
-    # run:applying is included because a confirmed apply after a long idle gap
-    # (e.g. 2 hours) means all agents were stopped by the idle checker
     if event_type in ['run:created', 'run:planning', 'run:applying', 'github:pull_request'] and active_agents < MAX_AGENTS:
         return True
     
@@ -273,19 +303,130 @@ def handle_github_webhook(action: str, pr_number: int, repo: str, base_ref: str)
         print(f"Sufficient agents running, not scaling up")
 
 
+def send_run_task_result(callback_url: str, access_token: str, status: str, message: str):
+    """Report the run task result back to TFC."""
+    result = {
+        'data': {
+            'type': 'task-results',
+            'attributes': {'status': status, 'message': message}
+        }
+    }
+    request = urllib.request.Request(
+        callback_url,
+        data=json.dumps(result).encode(),
+        method='PATCH',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/vnd.api+json'
+        }
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as callback_response:
+            print(f"Run task callback returned {callback_response.status}")
+    except urllib.error.HTTPError as e:
+        print(f"Run task callback failed with HTTP {e.code}: {e.read()[:500]}")
+    except Exception as e:
+        print(f"Run task callback failed: {e}")
+
+
+def process_run_task(job: dict):
+    """Ensure an agent is available for a confirmed apply, then report back to TFC."""
+    run_id = job.get('run_id', 'unknown')
+    workspace = job.get('workspace_name', 'unknown')
+    stage = job.get('stage')
+    print(f"Processing run task stage={stage} for run {run_id} in {workspace}")
+
+    status = 'passed'
+    if stage == 'pre_apply' and not job.get('is_speculative'):
+        try:
+            record_run_event(run_id, 'run_task:pre_apply', workspace)
+            update_agent_activity()
+            if get_active_agent_count() == 0:
+                start_agent()
+                message = 'Started a TFC agent for this apply'
+            else:
+                message = 'TFC agent already running'
+        except Exception as e:
+            print(f"Error ensuring agent for run {run_id}: {e}")
+            status = 'failed'
+            message = 'Could not start a TFC agent; check the lifecycle Lambda logs'
+    else:
+        message = f'No action needed for stage {stage}'
+
+    print(f"Run task result for {run_id}: {status} - {message}")
+    send_run_task_result(job['callback_url'], job['access_token'], status, message)
+
+
+def handle_run_task_request(body: str, signature: str, context) -> dict:
+    """Acknowledge a TFC run task request and hand the work to an async invocation."""
+    if not verify_run_task_signature(body.encode(), signature):
+        print("Invalid run task signature")
+        return http_response(401, {'error': 'Invalid signature'})
+
+    try:
+        payload = json.loads(body) if body else {}
+    except json.JSONDecodeError as e:
+        print(f"Invalid run task JSON: {e}")
+        return http_response(400, {'error': 'Invalid JSON'})
+
+    callback_url = payload.get('task_result_callback_url') or ''
+    access_token = payload.get('access_token') or ''
+    stage = payload.get('stage')
+    run_id = payload.get('run_id')
+
+    # The endpoint test sent when the run task is created only needs a 200
+    if not callback_url or not access_token:
+        print(f"Run task request without callback (stage={stage}, run={run_id}) - responding OK")
+        return http_response(200, {'status': 'ok'})
+
+    if not callback_url.startswith(f'https://{TFC_ADDRESS}/api/v2/task-results/'):
+        print(f"Rejecting run task callback URL outside {TFC_ADDRESS}")
+        return http_response(400, {'error': 'Unexpected callback URL'})
+
+    job = {
+        'callback_url': callback_url,
+        'access_token': access_token,
+        'stage': stage,
+        'run_id': run_id,
+        'workspace_name': payload.get('workspace_name'),
+        'is_speculative': bool(payload.get('is_speculative')),
+    }
+    # TFC requires the 200 before the result callback, so finish the work asynchronously
+    try:
+        lambda_client.invoke(
+            FunctionName=context.invoked_function_arn,
+            InvocationType='Event',
+            Payload=json.dumps({'run_task_callback': job}).encode()
+        )
+    except Exception as e:
+        print(f"Failed to queue run task processing for {run_id}: {e}")
+        return http_response(500, {'error': 'Failed to queue run task'})
+
+    print(f"Accepted run task stage={stage} for run {run_id}")
+    return http_response(200, {'status': 'accepted'})
+
+
 def handler(event, context):
     """Lambda handler for API Gateway webhook."""
-    print(f"Received event: {json.dumps(event)}")
-    
+    # Async self-invocation from handle_run_task_request (not logged: contains a bearer token)
+    if 'run_task_callback' in event:
+        process_run_task(event['run_task_callback'])
+        return {'status': 'ok'}
+
     # Extract payload and headers
     body = event.get('body', '')
     if event.get('isBase64Encoded'):
         import base64
         body = base64.b64decode(body).decode('utf-8')
     
-    headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+
+    if 'x-tfc-task-signature' in headers:
+        print("Received TFC run task request")
+        return handle_run_task_request(body, headers['x-tfc-task-signature'], context)
+
+    print(f"Received event: {json.dumps(event)}")
     
-    # Parse payload first to check for verification request
     try:
         payload = json.loads(body) if body else {}
     except json.JSONDecodeError as e:
@@ -299,14 +440,6 @@ def handler(event, context):
     tfc_signature = headers.get('x-tfe-notification-signature', '')
     github_signature = headers.get('x-hub-signature-256', '')
     github_event = headers.get('x-github-event', '')
-    
-    # Handle TFC verification request BEFORE signature check
-    if payload.get('payload_version') == 1 and 'verification' in str(payload):
-        print("TFC verification request - responding OK")
-        return {
-            'statusCode': 200,
-            'body': json.dumps({'status': 'ok'})
-        }
     
     # Handle GitHub ping event (sent when webhook is created)
     if github_event == 'ping':
@@ -378,6 +511,11 @@ def handler(event, context):
         
         for notification in notifications:
             event_type = notification.get('trigger', 'unknown')
+
+            # Covers the (signed) verification request sent when the notification is enabled
+            if not event_type.startswith('run:'):
+                print(f"Ignoring TFC notification trigger {event_type}")
+                continue
             
             try:
                 handle_tfc_webhook(event_type, run_id, workspace)

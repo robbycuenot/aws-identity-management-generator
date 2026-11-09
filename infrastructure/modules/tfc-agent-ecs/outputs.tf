@@ -36,6 +36,12 @@ output "webhook_secret" {
   sensitive   = true
 }
 
+output "run_task_hmac_key" {
+  description = "HMAC key for the pre-apply run task (use as 'hmac_key' in tfe_organization_run_task)"
+  value       = random_password.run_task_hmac_key.result
+  sensitive   = true
+}
+
 output "lifecycle_lambda_function_name" {
   description = "Name of the lifecycle manager Lambda function"
   value       = aws_lambda_function.lifecycle.function_name

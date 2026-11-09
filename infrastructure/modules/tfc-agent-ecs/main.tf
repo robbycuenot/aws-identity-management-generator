@@ -150,6 +150,48 @@ resource "aws_secretsmanager_secret_version" "webhook_secret" {
   secret_string = random_password.webhook_secret.result
 }
 
+# HMAC key for the pre-apply run task (TFC sends no notification when an apply is confirmed)
+resource "random_password" "run_task_hmac_key" {
+  length  = 32
+  special = false
+}
+
+# =============================================================================
+# TFC Agent Status Monitor (lets the idle checker skip busy agents)
+# =============================================================================
+
+resource "tfe_team" "agent_monitor" {
+  count        = var.enable_agent_status_check ? 1 : 0
+  name         = "${var.name_prefix}-monitor"
+  organization = var.tfc_organization
+  visibility   = "secret"
+
+  organization_access {
+    manage_agent_pools = true
+  }
+}
+
+resource "tfe_team_token" "agent_monitor" {
+  count       = var.enable_agent_status_check ? 1 : 0
+  team_id     = tfe_team.agent_monitor[0].id
+  description = "${var.name_prefix} idle checker agent status lookups"
+}
+
+resource "aws_secretsmanager_secret" "agent_monitor_token" {
+  count                   = var.enable_agent_status_check ? 1 : 0
+  name                    = "${var.name_prefix}-monitor-token"
+  description             = "TFC team token used by the idle checker to read agent status"
+  recovery_window_in_days = 0
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "agent_monitor_token" {
+  count         = var.enable_agent_status_check ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.agent_monitor_token[0].id
+  secret_string = tfe_team_token.agent_monitor[0].token
+}
+
 # =============================================================================
 # DynamoDB - Agent State Table
 # =============================================================================
@@ -481,6 +523,12 @@ resource "aws_iam_role_policy" "lifecycle_lambda" {
           aws_iam_role.ecs_task_execution.arn,
           aws_iam_role.ecs_task.arn
         ]
+      },
+      {
+        Sid      = "SelfInvokeForRunTasks"
+        Effect   = "Allow"
+        Action   = "lambda:InvokeFunction"
+        Resource = aws_lambda_function.lifecycle.arn
       }
     ]
   })
@@ -503,9 +551,11 @@ resource "aws_lambda_function" "lifecycle" {
       SECURITY_GROUP        = aws_security_group.ecs_tasks.id
       WEBHOOK_SECRET        = random_password.webhook_secret.result
       GITHUB_WEBHOOK_SECRET = var.enable_github_webhook ? random_password.github_webhook_secret[0].result : ""
+      RUN_TASK_HMAC_KEY     = random_password.run_task_hmac_key.result
       TABLE_NAME            = aws_dynamodb_table.agent_state.name
       MAX_AGENTS            = tostring(var.max_agents)
       IDLE_TIMEOUT_MINUTES  = tostring(var.idle_timeout_minutes)
+      AGENT_NAME_PREFIX     = var.tfc_agent_name
     }
   }
 
@@ -547,7 +597,7 @@ resource "aws_iam_role_policy" "idle_checker_lambda" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Sid    = "Logs"
         Effect = "Allow"
@@ -577,7 +627,14 @@ resource "aws_iam_role_policy" "idle_checker_lambda" {
         ]
         Resource = "*"
       }
-    ]
+      ], var.enable_agent_status_check ? [
+      {
+        Sid      = "AgentMonitorToken"
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = aws_secretsmanager_secret.agent_monitor_token[0].arn
+      }
+    ] : [])
   })
 }
 
@@ -592,9 +649,11 @@ resource "aws_lambda_function" "idle_checker" {
 
   environment {
     variables = {
-      CLUSTER_ARN          = aws_ecs_cluster.main.arn
-      TABLE_NAME           = aws_dynamodb_table.agent_state.name
-      IDLE_TIMEOUT_MINUTES = tostring(var.idle_timeout_minutes)
+      CLUSTER_ARN              = aws_ecs_cluster.main.arn
+      TABLE_NAME               = aws_dynamodb_table.agent_state.name
+      IDLE_TIMEOUT_MINUTES     = tostring(var.idle_timeout_minutes)
+      TFC_AGENT_POOL_ID        = tfe_agent_pool.main.id
+      TFC_API_TOKEN_SECRET_ARN = var.enable_agent_status_check ? aws_secretsmanager_secret.agent_monitor_token[0].arn : ""
     }
   }
 

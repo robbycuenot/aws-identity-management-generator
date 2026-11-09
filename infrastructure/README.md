@@ -98,6 +98,7 @@ Set these variables in your TFC workspace:
 | `tfc_agent_name` | terraform | no | Name for the TFC agent (appears in TFC UI) | `ecs-agent` |
 | `tfc_agent_max_agents` | terraform | no | Maximum number of concurrent ECS agent tasks | `3` |
 | `tfc_agent_idle_timeout_minutes` | terraform | no | Minutes of idle time before an agent is stopped | `15` |
+| `tfc_agent_enable_status_check` | terraform | no | Create a TFC team token so the idle checker never stops an agent TFC reports as busy (`TFE_TOKEN` must be able to manage teams) | `true` |
 | `enable_tfc_agent_github_webhook` | terraform | no | Enable GitHub webhook for speculative plan support | `false` |
 
 **Note:** When `enable_tfc_agent_ecs = true`, speculative plans are automatically disabled unless `enable_tfc_agent_github_webhook = true`. TFC doesn't send webhook notifications for speculative plans, but the GitHub webhook triggers agent scale-up when PRs are opened/updated.
@@ -172,6 +173,8 @@ docker_hub_access_token        = "dckr_pat_xxxxx"  # Mark as sensitive in TFC
 - Agent pool (organization-scoped)
 - Agent token (stored in AWS Secrets Manager)
 - Notification configuration (webhook triggers)
+- Pre-apply run task (advisory) attached to the workspace
+- Agent monitor team + team token with "Manage agent pools" (when `tfc_agent_enable_status_check = true`)
 
 **In AWS:**
 - API Gateway HTTP endpoint (webhook receiver)
@@ -203,15 +206,18 @@ TFC Run Created → Webhook POST → API Gateway → Lifecycle Manager Lambda
 **Webhook Events:**
 - `run:created` - New run started, ensures agents are available
 - `run:needs_attention` - Run waiting for approval, keeps agents alive
-- `run:applying` - Apply phase started, ensures agents are available
+- `run:applying` - Apply phase started (only fires once an agent has picked up the apply)
+
+**Pre-apply run task:** TFC sends no notification when an apply is confirmed, and the run waits in `apply_queued` until an agent is available. If the plan sat idle long enough for all agents to stop, nothing would wake one. An advisory pre-apply run task calls the same endpoint when an apply is confirmed; the Lifecycle Manager starts an agent if none are running and reports `passed` back to TFC. Being advisory, a failure only shows a warning and never blocks the apply.
 
 **Lifecycle Flow:**
 1. When a run is created, TFC sends a webhook to the Lifecycle Manager
 2. Lifecycle Manager checks DynamoDB for active agents
-3. If under `max_agents`, starts a new ECS task
+3. If under `max_agents`, starts a new ECS task with a unique agent name
 4. Agent connects to TFC agent pool and picks up jobs
 5. Every 5 minutes, Idle Checker scans DynamoDB for idle agents
-6. Agents idle longer than `idle_timeout_minutes` are stopped
+6. Agents idle longer than `idle_timeout_minutes` are stopped, unless TFC reports them as `busy` (requires `tfc_agent_enable_status_check`)
+7. When an apply is confirmed, the pre-apply run task starts an agent if none are running
 
 ### ECR Pull-Through Cache
 
