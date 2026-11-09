@@ -180,6 +180,12 @@ variable "tfc_agent_idle_timeout_minutes" {
   default     = 15
 }
 
+variable "tfc_agent_enable_status_check" {
+  description = "Create a TFC team token so the idle checker never stops an agent TFC reports as busy (TFE_TOKEN must be able to manage teams)"
+  type        = bool
+  default     = true
+}
+
 variable "tfc_agent_vpc_id" {
   description = "VPC ID for TFC agent (required if enable_tfc_agent_ecs = true)"
   type        = string
